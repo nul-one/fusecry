@@ -1,2 +1,6 @@
-# fusecry
-FUSE based encrypted (AES.MODE_CBC) filesystem
+fusecry
+==================================================
+
+FUSE based encrypted (AES.MODE\_CBC) filesystem
+
+
