@@ -11,9 +11,16 @@ install
 usage
 -------------------------
 
-- create 2 empty directories (e.g. `~/source` and `~/dest`)
-- run `python3 -m fusecry mount ~/source ~/dest`
-- enter password
-- copy data in ~/dest and it will remain encrypted in ~/source after unmounting
-- ctrl+c to stop
+Create 2 empty directories (e.g. `~/source` and `~/dest`). Run
+`fusecry mount ~/source ~/dest`, enter password. Copy data in `~/dest` and it
+will remain encrypted in `~/source` after unmounting. Ctrl+c to unmount.
+
+future plans (in no particular order)
+-------------------------
+
+- deamon
+- encrypting/decrypting single files
+- choice and detection of chunk sizes
+- password validation
+- password change
 

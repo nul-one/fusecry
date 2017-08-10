@@ -47,7 +47,6 @@ def parse_args():
     )
     return parser.parse_args()
 
-#def main(root, mountpoint, password):
 def main():
     signal.signal(signal.SIGINT, signal_handler)
     args = parse_args()

@@ -13,6 +13,11 @@ setup(
     author_email = fusecry.__author_email__,
     license = fusecry.__licence__,
     packages = [ 'fusecry' ],
+    entry_points={
+        'console_scripts': [
+            'fusecry=fusecry.__main__:main',
+        ],
+    },
     install_requires = [
             'fusepy>=2.0.4',
             'pycrypto>=2.6.1',
