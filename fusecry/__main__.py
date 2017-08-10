@@ -6,7 +6,7 @@ Main runnable.
 """
 
 from fuse import FUSE
-from fusecry.fusecry import Fusecry as filesystem
+from fusecry.filesystem import Fusecry
 from fusecry.securedata import secure
 from getpass import getpass
 import argparse
@@ -45,6 +45,15 @@ def parse_args():
     parser_mount.set_defaults(
         debug=False,
     )
+    parser_encrypt = subparsers.add_parser(
+        'encrypt',
+        description='Encrypt single file.'
+        )
+    parser_decrypt = subparsers.add_parser(
+        'encrypt',
+        description='Decrypt single file.'
+        )
+ 
     return parser.parse_args()
 
 def main():
@@ -60,7 +69,7 @@ def main():
                 password = None
                 print("Passwords did not match. Try again...")
         FUSE(
-            filesystem(
+            Fusecry(
                 args.root,
                 secure(password),
                 args.debug
