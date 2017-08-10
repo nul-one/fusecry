@@ -8,10 +8,14 @@ Main runnable.
 from fuse import FUSE
 from fusecry.fusecry import Fusecry as filesystem
 from fusecry.securedata import secure
-import fusecry
-import argparse
-import sys
 from getpass import getpass
+import argparse
+import signal
+import sys
+
+def signal_handler(signal, frame):
+    print("KeyboardInterrupt captured. Stopping Fusecry gracefully...")
+    sys.exit(0)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -45,9 +49,17 @@ def parse_args():
 
 #def main(root, mountpoint, password):
 def main():
+    signal.signal(signal.SIGINT, signal_handler)
     args = parse_args()
     if args.cmd == 'mount':
-        password = args.password or getpass()
+        password = secure(args.password)
+        del args.password
+        while not password:
+            password = secure(getpass())
+            print("Confirm...")
+            if password != getpass():
+                password = None
+                print("Passwords did not match. Try again...")
         FUSE(
             filesystem(
                 args.root,
