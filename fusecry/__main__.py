@@ -143,25 +143,28 @@ def main():
     if args.cmd == 'mount':
         password = get_secure_password(args.password)
         del args.password # don't keep it plaintext in memory
+        mountpoint = os.path.abspath(args.mountpoint)
+        root = os.path.abspath(args.root)
         pidfile = os.path.join(
-            os.path.dirname(os.path.abspath(args.mountpoint)),
-            '.'+os.path.basename(os.path.abspath(args.mountpoint))+'.fcry.pid'
+            os.path.dirname(mountpoint),
+            '.'+os.path.basename(os.path.abspath(mountpoint))+'.fcry.pid'
             )
         fuse_daemon = FuseDaemon(
-            pidfile, args.root, args.mountpoint, password, args.debug
+            pidfile, root, mountpoint, password, args.debug
             )
         print("-- mounting '{}' to '{}' with encryption".format(
-            args.root, args.mountpoint
+            root, mountpoint
             ))
         fuse_daemon.start()
     elif args.cmd == 'umount':
+        mountpoint = os.path.abspath(args.mountpoint)
         pidfile = os.path.join(
-            os.path.dirname(os.path.abspath(args.mountpoint)),
-            '.'+os.path.basename(os.path.abspath(args.mountpoint))+'.fcry.pid'
+            os.path.dirname(mountpoint),
+            '.'+os.path.basename(mountpoint)+'.fcry.pid'
             )
-        fuse_daemon = FuseDaemon(pidfile, None, args.mountpoint, None, None)
+        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None)
         fuse_daemon.stop()
-        print("-- '{}' has been unmounted".format(args.mountpoint))
+        print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
         password = get_secure_password(args.password)
         single.encrypt(cry.Cry(password), args.in_file, args.out_file)
