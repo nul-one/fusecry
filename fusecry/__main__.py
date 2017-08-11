@@ -15,7 +15,7 @@ import signal
 import sys
 
 def signal_handler(signal, frame):
-    print("KeyboardInterrupt captured. Stopping Fusecry gracefully...")
+    print("KeyboardInterrupt captured. Stopping Fusecry gracefully.")
     sys.exit(0)
 
 def parse_args():
@@ -75,26 +75,45 @@ def parse_args():
     parser_decrypt.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
+
+    parser_toggle = subparsers.add_parser(
+        'toggle',
+        description='Ecrypt raw or decrypt .fcry files and delete the original.'
+        )
+    parser_toggle .add_argument(
+        'toggle_files', type=str, action="store", nargs="+",
+        help='Input raw file or encrypted .fcry file.')
+    parser_toggle .add_argument(
+        '-p', '--password', action="store",
+        help="If not provided, will be asked for password in prompt.")
  
     return parser.parse_args()
 
 
-def secure_password(password=None):
+def get_secure_password(password=None):
+    if not password:
+        password = getpass()
+    return secure(password)
+
+def get_secure_password_twice(password=None):
     while not password:
-        password = secure(getpass())
+        password = get_secure_password(password)
         print("Confirm...")
         if password != getpass():
             password = None
-            print("Passwords did not match. Try again...")
-    return secure(password)
+            print("\nPasswords did not match. Try again...")
+    return password
  
 
 def main():
     signal.signal(signal.SIGINT, signal_handler)
     args = parse_args()
     if args.cmd == 'mount':
-        password = secure_password(args.password)
-        del args.password
+        password = get_secure_password(args.password)
+        del args.password # don't keep it plaintext in memory
+        print("-- '{}' mounted to '{}' with password encryption".format(
+            args.root,args.mountpoint
+            ))
         FUSE(
             Fusecry(
                 args.root,
@@ -106,11 +125,16 @@ def main():
             foreground=True
             )
     elif args.cmd == 'encrypt':
-        password = secure_password(args.password)
+        password = get_secure_password(args.password)
         single.encrypt(cry.Cry(password), args.in_file, args.out_file)
     elif args.cmd == 'decrypt':
-        password = secure_password(args.password)
+        password = get_secure_password(args.password)
         single.decrypt(cry.Cry(password), args.in_file, args.out_file)
+    elif args.cmd == 'toggle':
+        password = get_secure_password_twice(args.password)
+        toggle_cry = cry.Cry(password)
+        for path in args.toggle_files:
+            single.toggle(toggle_cry, path, info=True)
 
 
 if __name__ == '__main__':
