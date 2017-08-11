@@ -17,11 +17,11 @@ features
 usage
 -------------------------
 
-### mount
+### mount/umount
 
 `fusecry mount SOURCE_DIR MOUNT_POINT`  
+`fusecry umount MOUNT_POINT`  
 Data copied to mount point will remain encrypted in source directory.  
-File names are kept intact.  
 
 ### single file encryption
 
@@ -34,7 +34,6 @@ in the process. It asumes files with '.fcry' extension are encrypted ones.
 future plans (in no particular order)
 -------------------------
 
-- mount in deamon mode
 - choice and detection of chunk sizes
 - password validation
 - password change (bulk re-encryption)
