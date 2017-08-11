@@ -31,9 +31,10 @@ Data copied to mount point will remain encrypted in source directory.
 Toggle will encrypt raw files and decrypt encrypted files and delete originals
 in the process. It asumes files with '.fcry' extension are encrypted ones.
 
-future plans (in no particular order)
+future plans and missing features (in no particular order)
 -------------------------
 
+- threading
 - choice and detection of chunk sizes
 - password validation
 - password change (bulk re-encryption)
