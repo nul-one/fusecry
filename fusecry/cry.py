@@ -13,8 +13,8 @@ class Cry(object):
         self.password = password
 
     def enc(self, chunk):
-        ks = config.encryption.key_size
-        vs = config.encryption.iv_size
+        ks = config.enc.key_size
+        vs = config.enc.iv_size
         if len(chunk) % AES.block_size != 0:
             chunk += bytes(AES.block_size - len(chunk) % AES.block_size)
         random_key = Random.get_random_bytes(ks)
@@ -32,8 +32,8 @@ class Cry(object):
 
     def dec(self, enc_chunk):
         poz = 0
-        ks = config.encryption.key_size
-        vs = config.encryption.iv_size
+        ks = config.enc.key_size
+        vs = config.enc.iv_size
         secret_iv = enc_chunk[poz:poz+vs]; poz+=vs
         encrypted_random_key = enc_chunk[poz:poz+ks]; poz+=ks
         encrypted_random_iv = enc_chunk[poz:poz+vs]; poz+=vs

@@ -2,7 +2,6 @@
 Fusecry FUSE operations.
 """
 
-from Crypto.Cipher.AES import block_size as aes_block_size
 from datetime import datetime
 from fuse import FuseOSError, Operations
 from fusecry import cry, io
@@ -96,7 +95,7 @@ class Fusecry(Operations):
         stat = dict((key, getattr(stv, key)) for key in (
             'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
             'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'))
-        chunk_size = config.encryption.chunk_blocks * aes_block_size
+        chunk_size = config.enc.chunk_size
         block_ratio = chunk_size / stat['f_bsize']
         stat['f_bsize']     = chunk_size 
         stat['f_frsize']    = chunk_size

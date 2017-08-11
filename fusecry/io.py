@@ -2,7 +2,6 @@
 Fusecry IO functions.
 """
 
-from Crypto.Cipher import AES 
 import fusecry.config as config
 import os
 import struct
@@ -13,8 +12,8 @@ def read(cry, path, length, offset):
     length = min(length, filesize(path) - offset)
     if length <= 0:
         return buf
-    cs = config.encryption.chunk_blocks * AES.block_size
-    ms = config.encryption.key_size + 2 * config.encryption.iv_size
+    cs = config.enc.chunk_size
+    ms = config.enc.key_size + 2 * config.enc.iv_size
     ncc = int(offset / cs) # number of untouched chunks
     sb = offset % cs # skip bytes in first crypto chunk
     with open(path,'rb') as f:
@@ -24,8 +23,8 @@ def read(cry, path, length, offset):
             data_len = len(data)-ms
             if data_len <= struct.calcsize('Q'):
                 break
-            if data_len % AES.block_size:
-                data = data[:-(data_len%AES.block_size)]
+            if data_len % config.enc.aes_block:
+                data = data[:-(data_len%config.enc.aes_block)]
             buf += cry.dec(data)
     return buf[sb:sb+length]
  
@@ -48,16 +47,16 @@ def attr(path):
             if os.access(path, os.R_OK):
                 attr['st_size'] = filesize(path)
             else:
-                cs = config.encryption.chunk_blocks * AES.block_size
-                ms = config.encryption.key_size + 2 * config.encryption.iv_size
+                cs = config.enc.chunk_size
+                ms = config.enc.key_size + 2 * config.enc.iv_size
                 ratio = cs / (ms+cs)
                 attr['st_size'] = \
                     int((attr['st_size']-struct.calcsize('Q'))*ratio)
     return attr
     
 def write(cry, path, buf, offset):
-    cs = config.encryption.chunk_blocks * AES.block_size
-    ms = config.encryption.key_size + 2 * config.encryption.iv_size
+    cs = config.enc.chunk_size
+    ms = config.enc.key_size + 2 * config.enc.iv_size
     xbuf = b''
     old_crypto=b''
     ncc = int(offset / cs) # number of untouched chunks
@@ -70,8 +69,8 @@ def write(cry, path, buf, offset):
             data = f.read(ms+cs)
             data_len = len(data)-ms
             if data_len > struct.calcsize('Q'):
-                if data_len % AES.block_size:
-                    data = data[:-(data_len%AES.block_size)]
+                if data_len % config.enc.aes_block:
+                    data = data[:-(data_len%config.enc.aes_block)]
                 xbuf = cry.dec(data)[:offset%cs] + buf
     else:
         # just right block size
@@ -93,8 +92,8 @@ def write(cry, path, buf, offset):
 
 def truncate(cry, path, length):
     if length:
-        cs = config.encryption.chunk_blocks * AES.block_size
-        ms = config.encryption.key_size + 2 * config.encryption.iv_size
+        cs = config.enc.chunk_size
+        ms = config.enc.key_size + 2 * config.enc.iv_size
         ncc = int(length/cs) # number of untouched chunks
         data = read(path, length%cs, ncc*cs)
         with open(path, 'r+b') as f:
@@ -105,4 +104,11 @@ def truncate(cry, path, length):
     else:
         with open(path, 'r+b') as f:
             f.truncate(0)
+
+
+def touch(fname, mode=0o644, dir_fd=None, **kwargs):
+    flags = os.O_CREAT | os.O_APPEND
+    with os.fdopen(os.open(fname, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
+        os.utime(f.fileno() if os.utime in os.supports_fd else fname,
+            dir_fd=None if os.supports_fd else dir_fd, **kwargs)
 
