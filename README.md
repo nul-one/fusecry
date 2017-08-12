@@ -1,7 +1,15 @@
-fusecry
+fusecry 
 ==================================================
+[![Build Status](https://travis-ci.org/phlogisto/fusecry.png)](https://travis-ci.org/phlogisto/fusecry)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fusecry/Lobby)
 
 FUSE based encrypted (AES.MODE\_CBC) filesystem and encryption tool
+
+requirements
+-------------------------
+
+- Linux
+- python >= 3.4
 
 install
 -------------------------
@@ -39,7 +47,6 @@ known deficiencies and limitations
 
 - file names are not being encrypted by design
 - block size is fixed to 4096
-- even with arbitra
 
 future plans and missing features (in no particular order)
 -------------------------
