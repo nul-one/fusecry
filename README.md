@@ -6,7 +6,10 @@ FUSE based encrypted (AES.MODE\_CBC) filesystem and encryption tool
 install
 -------------------------
 
-`pip3 install --upgrade git+https://github.com/phlogisto/fusecry.git`
+`pip3 install -U git+https://github.com/phlogisto/fusecry.git`  
+
+In addition, add the following to your `.bashrc` to enable autocompletion:  
+`eval "$(register-python-argcomplete fusecry)"`
 
 features
 -------------------------
@@ -30,6 +33,13 @@ Data copied to mount point will remain encrypted in source directory.
 `fusecry toggle TOGGLE_FILE [TOGGLE_FILE [TOGGLE_FILE ...]]`  
 Toggle will encrypt raw files and decrypt encrypted files and delete originals
 in the process. It asumes files with '.fcry' extension are encrypted ones.
+
+known deficiencies and limitations
+-------------------------
+
+- file names are not being encrypted by design
+- block size is fixed to 4096
+- even with arbitra
 
 future plans and missing features (in no particular order)
 -------------------------

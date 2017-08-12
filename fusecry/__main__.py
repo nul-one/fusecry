@@ -11,6 +11,7 @@ from fusecry.daemon import Daemon
 from fusecry.filesystem import Fusecry
 from fusecry.securedata import secure
 from getpass import getpass
+import argcomplete
 import argparse
 import os
 import signal
@@ -119,7 +120,7 @@ def parse_args():
     parser_toggle .add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
- 
+    argcomplete.autocomplete(parser)
     return parser.parse_args()
 
 
@@ -138,8 +139,8 @@ def get_secure_password_twice(password=None):
     return password
  
 def main():
-    signal.signal(signal.SIGINT, signal_handler)
     args = parse_args()
+    signal.signal(signal.SIGINT, signal_handler)
     if args.cmd == 'mount':
         password = get_secure_password(args.password)
         del args.password # don't keep it plaintext in memory

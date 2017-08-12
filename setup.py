@@ -21,6 +21,7 @@ setup(
     install_requires = [
             'fusepy>=2.0.4',
             'pycrypto>=2.6.1',
+            'argcomplete>=1.8.2:',
         ],
     )
 
