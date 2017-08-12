@@ -14,8 +14,13 @@ requirements
 install
 -------------------------
 
+### install from pypi
+`pip3 install fusecry`  
+
+### install from github
 `pip3 install -U git+https://github.com/phlogisto/fusecry.git`  
 
+### autocompletion
 In addition, add the following to your `.bashrc` to enable autocompletion:  
 `eval "$(register-python-argcomplete fusecry)"`
 
