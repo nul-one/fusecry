@@ -28,3 +28,15 @@ def test_cry_dec():
     data = os.urandom(5000)
     assert data == c.dec(c.enc(data))[:len(data)]
 
+def test_cry_enc_ic():
+    c = cry.Cry(random_string(15), True)
+    data = os.urandom(5000)
+    assert len(c.enc(data)) % config.enc.aes_block == 0
+    assert data != c.enc(data)[:len(data)]
+    assert c.enc(data) != c.enc(data)
+
+def test_cry_dec_ic():
+    c = cry.Cry(random_string(15), True)
+    data = os.urandom(5000)
+    assert data == c.dec(c.enc(data))[:len(data)]
+
