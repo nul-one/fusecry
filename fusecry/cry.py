@@ -9,14 +9,21 @@ import fusecry.config as config
 
 
 class Cry(object):
-    def __init__(self, password):
+    def __init__(self, password, integrity_check=False):
         self.password = password
+        self.integrity_check = integrity_check
 
     def enc(self, chunk):
         ks = config.enc.key_size
         vs = config.enc.iv_size
+        checksum = MD5.new() if self.integrity_check else None
+        if not chunk:
+            return b''
         if len(chunk) % AES.block_size != 0:
             chunk += bytes(AES.block_size - len(chunk) % AES.block_size)
+        if self.integrity_check:
+            checksum.update(chunk)
+            chunk += checksum.digest()
         random_key = Random.get_random_bytes(ks)
         random_iv = Random.get_random_bytes(vs)
         random_encryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
@@ -30,10 +37,12 @@ class Cry(object):
             + encrypted_random_iv \
             + random_encryptor.encrypt(chunk)
 
-    def dec(self, enc_chunk):
+    def dec(self, enc_chunk, integrity_check=False):
         poz = 0
         ks = config.enc.key_size
         vs = config.enc.iv_size
+        if not enc_chunk:
+            return b''
         secret_iv = enc_chunk[poz:poz+vs]; poz+=vs
         encrypted_random_key = enc_chunk[poz:poz+ks]; poz+=ks
         encrypted_random_iv = enc_chunk[poz:poz+vs]; poz+=vs
@@ -42,7 +51,13 @@ class Cry(object):
         random_key = secret_decryptor.decrypt(encrypted_random_key)
         random_iv = secret_decryptor.decrypt(encrypted_random_iv)
         random_decryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
-        return random_decryptor.decrypt(
-                enc_chunk[poz:]
-            )
+        chunk = random_decryptor.decrypt(enc_chunk[poz:])
+        if self.integrity_check:
+            checksum = MD5.new()
+            checksum.update(chunk[:-MD5.digest_size])
+            if checksum.digest() == chunk[-MD5.digest_size:]:
+                chunk = chunk[:-MD5.digest_size]
+            else:
+                raise Exception("Integrity check failed.")
+        return chunk
 

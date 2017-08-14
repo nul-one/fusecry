@@ -25,11 +25,13 @@ class FuseDaemon(Daemon):
     """
     Daemonize fuse process.
     """
-    def __init__(self, pidfile, root, mountpoint, password, debug):
+    def __init__(self, pidfile, root, mountpoint, password, integrity_check,
+            debug):
         self.pidfile = pidfile
         self.root = root
         self.mountpoint = mountpoint
         self.password = password
+        self.integrity_check = integrity_check
         self.debug = debug
 
     def run(self):
@@ -37,6 +39,7 @@ class FuseDaemon(Daemon):
             Fusecry(
                 self.root,
                 self.password,
+                self.integrity_check,
                 self.debug
                 ),
             self.mountpoint,
@@ -68,6 +71,9 @@ def parse_args():
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
     parser_mount.add_argument(
+        '--without-ic', action="store_true",
+        help="Disable file integrity check option.")
+    parser_mount.add_argument(
         '-d', '--debug', action="store_true",
         help="Enable debug mode with print output of each fs action.")
     parser_mount.set_defaults(
@@ -93,6 +99,9 @@ def parse_args():
         'out_file', type=str, action="store",
         help='Encrypted file output.')
     parser_encrypt.add_argument(
+        '--without-ic', action="store_true",
+        help="Disable file integrity check option.")
+    parser_encrypt.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
 
@@ -107,6 +116,9 @@ def parse_args():
         'out_file', type=str, action="store",
         help='Decrypted file output.')
     parser_decrypt.add_argument(
+        '--without-ic', action="store_true",
+        help="Disable file integrity check option.")
+    parser_decrypt.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
 
@@ -117,6 +129,9 @@ def parse_args():
     parser_toggle .add_argument(
         'toggle_files', type=str, action="store", nargs="+",
         help='Input raw file or encrypted .fcry file.')
+    parser_toggle.add_argument(
+        '--without-ic', action="store_true",
+        help="Disable file integrity check option.")
     parser_toggle .add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
@@ -142,39 +157,54 @@ def main():
     args = parse_args()
     signal.signal(signal.SIGINT, signal_handler)
     if args.cmd == 'mount':
-        password = get_secure_password(args.password)
+        password = get_secure_password_twice(args.password)
         del args.password # don't keep it plaintext in memory
         mountpoint = os.path.abspath(args.mountpoint)
         root = os.path.abspath(args.root)
-        pidfile = os.path.join(
-            os.path.dirname(mountpoint),
-            '.'+os.path.basename(os.path.abspath(mountpoint))+'.fcry.pid'
-            )
-        fuse_daemon = FuseDaemon(
-            pidfile, root, mountpoint, password, args.debug
-            )
-        print("-- mounting '{}' to '{}' with encryption".format(
-            root, mountpoint
+        print("-- mounting '{}' to '{}' with encryption{}".format(
+            root, mountpoint,
+            ' and file integrity check' if not args.without_ic else ''
             ))
-        fuse_daemon.start()
+        if args.debug:
+            FUSE(
+                Fusecry(
+                    root,
+                    password,
+                    not args.without_ic,
+                    args.debug
+                    ),
+                mountpoint,
+                nothreads=True,
+                foreground=True
+                )
+        else:
+            pidfile = os.path.join(
+                os.path.dirname(mountpoint),
+                '.'+os.path.basename(os.path.abspath(mountpoint))+'.fcry.pid'
+                )
+            fuse_daemon = FuseDaemon(
+                pidfile, root, mountpoint, password, not args.without_ic,
+                args.debug
+                )
+            fuse_daemon.start()
     elif args.cmd == 'umount':
         mountpoint = os.path.abspath(args.mountpoint)
         pidfile = os.path.join(
             os.path.dirname(mountpoint),
             '.'+os.path.basename(mountpoint)+'.fcry.pid'
             )
-        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None)
+        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None, None)
         fuse_daemon.stop()
         print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
         password = get_secure_password(args.password)
-        single.encrypt(cry.Cry(password), args.in_file, args.out_file)
+        single.encrypt(cry.Cry(password, not args.without_ic), args.in_file, args.out_file)
     elif args.cmd == 'decrypt':
         password = get_secure_password(args.password)
-        single.decrypt(cry.Cry(password), args.in_file, args.out_file)
+        single.decrypt(cry.Cry(password, not args.without_ic), args.in_file, args.out_file)
     elif args.cmd == 'toggle':
         password = get_secure_password_twice(args.password)
-        toggle_cry = cry.Cry(password)
+        toggle_cry = cry.Cry(password, not args.without_ic)
         for path in args.toggle_files:
             single.toggle(toggle_cry, path, info=True)
 

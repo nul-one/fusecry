@@ -23,8 +23,8 @@ def debug_log(func):
     return function_wrapper
 
 class Fusecry(Operations):
-    def __init__(self, root, password, debug=True):
-        self.cry = cry.Cry(password)
+    def __init__(self, root, password, integrity_check=False, debug=False):
+        self.cry = cry.Cry(password, integrity_check)
         self.root = root
         self.debug = debug
 
