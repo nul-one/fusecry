@@ -28,6 +28,7 @@ features
 -------------------------
 
 - mount
+- integration check
 - encrypt/decrypt single files
 
 usage
