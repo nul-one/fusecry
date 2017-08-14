@@ -3,4 +3,5 @@
 build/
 dist/
 fusecry.egg-info/
+.cache
 
