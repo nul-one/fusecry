@@ -25,13 +25,13 @@ class FuseDaemon(Daemon):
     """
     Daemonize fuse process.
     """
-    def __init__(self, pidfile, root, mountpoint, password, integrity_check,
+    def __init__(self, pidfile, root, mountpoint, password, ignore_ic,
             debug):
         self.pidfile = pidfile
         self.root = root
         self.mountpoint = mountpoint
         self.password = password
-        self.integrity_check = integrity_check
+        self.ignore_ic = ignore_ic
         self.debug = debug
 
     def run(self):
