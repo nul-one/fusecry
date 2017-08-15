@@ -123,9 +123,37 @@ class FusecryIO(object):
                         int((attr['st_size']-struct.calcsize('Q'))*ratio)
         return attr
     
-    def touch(self, fname, mode=0o644, dir_fd=None, **kwargs):
+    def touch(self, path, mode=0o644, dir_fd=None, **kwargs):
         flags = os.O_CREAT | os.O_APPEND
-        with os.fdopen(os.open(fname, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
-            os.utime(f.fileno() if os.utime in os.supports_fd else fname,
+        with os.fdopen(os.open(path, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
+            os.utime(f.fileno() if os.utime in os.supports_fd else path,
                 dir_fd=None if os.supports_fd else dir_fd, **kwargs)
+
+    def fsck_file(self, path):
+        size = 0
+        try:
+            size = self.filesize(path)
+        except Exception as e:
+            return "{}: {}".format(type(e), e)
+        if not self.ignore_ic:
+            try:
+                offset = 0
+                while offset < size:
+                    self.read(path, self.cs, offset)
+                    offset += self.cs
+            except:
+                return "{}: {}".format(type(e), e)
+        return None
+
+    def fsck(self, path):
+        errors = False
+        total_files = sum([ len(f) for r,d,f in os.walk(path) ])
+        print("Fusecry FSCK: checking {} files...".format(total_files))
+        for r,d,f in os.walk(path):
+            for file_name in f:
+                error = self.fsck_file(os.path.join(r,file_name))
+                if error:
+                    errors = True
+                    print(error)
+        return errors
 

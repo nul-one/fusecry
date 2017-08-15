@@ -6,7 +6,7 @@ Main runnable.
 """
 
 from fuse import FUSE
-from fusecry import single, cry
+from fusecry import single, cry, io
 from fusecry.daemon import Daemon
 from fusecry.filesystem import Fusecry
 from fusecry.securedata import secure
@@ -132,6 +132,21 @@ def parse_args():
     parser_toggle .add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
+
+    parser_fsck= subparsers.add_parser(
+        'fsck',
+        description='Perform integrity check on all files and print results.'
+        )
+    parser_fsck.add_argument(
+        'root', type=str, action="store",
+        help='Root dir of fusecry fs that is not mounted.')
+    parser_fsck.add_argument(
+        '--ignore-ic', action="store_true",
+        help="Don't fail on integrity check error.")
+    parser_fsck.add_argument(
+        '-p', '--password', action="store",
+        help="If not provided, will be asked for password in prompt.")
+
     argcomplete.autocomplete(parser)
     return parser.parse_args()
 
@@ -205,6 +220,10 @@ def main():
         toggle_cry = cry.Cry(password)
         for path in args.toggle_files:
             single.toggle(toggle_cry, path, args.ignore_ic, info=True)
+    elif args.cmd == 'fsck':
+        password = get_secure_password(args.password)
+        root = os.path.abspath(args.root)
+        io.FusecryIO(cry.Cry(password), args.ignore_ic).fsck(root)
 
 if __name__ == '__main__':
     main()
