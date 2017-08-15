@@ -52,13 +52,12 @@ known deficiencies and limitations
 -------------------------
 
 - file names are not being encrypted by design
-- block size is fixed to 4096
+- block size is fixed to 4096 (will become option to change)
 
 future plans and missing features (in no particular order)
 -------------------------
 
 - threading
 - choice and detection of chunk sizes
-- password validation
 - password change (bulk re-encryption)
 
