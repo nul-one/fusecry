@@ -9,21 +9,19 @@ import fusecry.config as config
 
 
 class Cry(object):
-    def __init__(self, password, integrity_check=False):
+    def __init__(self, password):
         self.password = password
-        self.integrity_check = integrity_check
 
     def enc(self, chunk):
         ks = config.enc.key_size
         vs = config.enc.iv_size
-        checksum = MD5.new() if self.integrity_check else None
+        checksum = MD5.new()
         if not chunk:
             return b''
         if len(chunk) % AES.block_size != 0:
             chunk += bytes(AES.block_size - len(chunk) % AES.block_size)
-        if self.integrity_check:
-            checksum.update(chunk)
-            chunk += checksum.digest()
+        checksum.update(chunk)
+        chunk = checksum.digest() + chunk
         random_key = Random.get_random_bytes(ks)
         random_iv = Random.get_random_bytes(vs)
         random_encryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
@@ -37,7 +35,7 @@ class Cry(object):
             + encrypted_random_iv \
             + random_encryptor.encrypt(chunk)
 
-    def dec(self, enc_chunk, integrity_check=False):
+    def dec(self, enc_chunk):
         poz = 0
         ks = config.enc.key_size
         vs = config.enc.iv_size
@@ -52,12 +50,8 @@ class Cry(object):
         random_iv = secret_decryptor.decrypt(encrypted_random_iv)
         random_decryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
         chunk = random_decryptor.decrypt(enc_chunk[poz:])
-        if self.integrity_check:
-            checksum = MD5.new()
-            checksum.update(chunk[:-MD5.digest_size])
-            if checksum.digest() == chunk[-MD5.digest_size:]:
-                chunk = chunk[:-MD5.digest_size]
-            else:
-                raise Exception("Integrity check failed.")
-        return chunk
+        checksum = MD5.new()
+        checksum.update(chunk[MD5.digest_size:])
+        old_checksum = chunk[:MD5.digest_size]
+        return chunk[MD5.digest_size:], old_checksum == checksum.digest()
 

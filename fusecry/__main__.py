@@ -39,7 +39,7 @@ class FuseDaemon(Daemon):
             Fusecry(
                 self.root,
                 self.password,
-                self.integrity_check,
+                self.ignore_ic,
                 self.debug
                 ),
             self.mountpoint,
@@ -71,8 +71,8 @@ def parse_args():
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
     parser_mount.add_argument(
-        '--without-ic', action="store_true",
-        help="Disable file integrity check option.")
+        '--ignore-ic', action="store_true",
+        help="Don't fail on integrity check error.")
     parser_mount.add_argument(
         '-d', '--debug', action="store_true",
         help="Enable debug mode with print output of each fs action.")
@@ -99,9 +99,6 @@ def parse_args():
         'out_file', type=str, action="store",
         help='Encrypted file output.')
     parser_encrypt.add_argument(
-        '--without-ic', action="store_true",
-        help="Disable file integrity check option.")
-    parser_encrypt.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
 
@@ -116,8 +113,8 @@ def parse_args():
         'out_file', type=str, action="store",
         help='Decrypted file output.')
     parser_decrypt.add_argument(
-        '--without-ic', action="store_true",
-        help="Disable file integrity check option.")
+        '--ignore-ic', action="store_true",
+        help="Don't fail on integrity check error.")
     parser_decrypt.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
@@ -130,8 +127,8 @@ def parse_args():
         'toggle_files', type=str, action="store", nargs="+",
         help='Input raw file or encrypted .fcry file.')
     parser_toggle.add_argument(
-        '--without-ic', action="store_true",
-        help="Disable file integrity check option.")
+        '--ignore-ic', action="store_true",
+        help="Don't fail on integrity check error.")
     parser_toggle .add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
@@ -163,14 +160,14 @@ def main():
         root = os.path.abspath(args.root)
         print("-- mounting '{}' to '{}' with encryption{}".format(
             root, mountpoint,
-            ' and file integrity check' if not args.without_ic else ''
+            ' and file integrity check' if not args.ignore_ic else ''
             ))
         if args.debug:
             FUSE(
                 Fusecry(
                     root,
                     password,
-                    not args.without_ic,
+                    args.ignore_ic,
                     args.debug
                     ),
                 mountpoint,
@@ -183,7 +180,7 @@ def main():
                 '.'+os.path.basename(os.path.abspath(mountpoint))+'.fcry.pid'
                 )
             fuse_daemon = FuseDaemon(
-                pidfile, root, mountpoint, password, not args.without_ic,
+                pidfile, root, mountpoint, password, args.ignore_ic,
                 args.debug
                 )
             fuse_daemon.start()
@@ -197,16 +194,17 @@ def main():
         fuse_daemon.stop()
         print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
-        password = get_secure_password(args.password)
-        single.encrypt(cry.Cry(password, not args.without_ic), args.in_file, args.out_file)
+        password = get_secure_password_twice(args.password)
+        single.encrypt(cry.Cry(password), args.in_file, args.out_file)
     elif args.cmd == 'decrypt':
         password = get_secure_password(args.password)
-        single.decrypt(cry.Cry(password, not args.without_ic), args.in_file, args.out_file)
+        single.decrypt(cry.Cry(password), args.in_file, args.out_file,
+            args.ignore_ic)
     elif args.cmd == 'toggle':
         password = get_secure_password_twice(args.password)
-        toggle_cry = cry.Cry(password, not args.without_ic)
+        toggle_cry = cry.Cry(password)
         for path in args.toggle_files:
-            single.toggle(toggle_cry, path, info=True)
+            single.toggle(toggle_cry, path, args.ignore_ic, info=True)
 
 if __name__ == '__main__':
     main()

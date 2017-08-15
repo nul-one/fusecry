@@ -4,7 +4,8 @@ Fusecry FUSE operations.
 
 from datetime import datetime
 from fuse import FuseOSError, Operations
-from fusecry import cry, io
+from fusecry import cry
+from fusecry.io import FusecryIO
 import errno
 import fusecry.config as config
 import os
@@ -23,10 +24,10 @@ def debug_log(func):
     return function_wrapper
 
 class Fusecry(Operations):
-    def __init__(self, root, password, integrity_check=False, debug=False):
-        self.cry = cry.Cry(password, integrity_check)
+    def __init__(self, root, password, ignore_ic=False, debug=False):
         self.root = root
         self.debug = debug
+        self.io = FusecryIO(cry.Cry(password), ignore_ic)
 
     def __real_path(self, partial):
         if partial.startswith("/"):
@@ -52,7 +53,7 @@ class Fusecry(Operations):
     
     @debug_log
     def getattr(self, path, fh=None):
-        return io.attr(self.__real_path(path))
+        return self.io.attr(self.__real_path(path))
     
     @debug_log
     def readdir(self, path, fh):
@@ -139,15 +140,15 @@ class Fusecry(Operations):
 
     @debug_log
     def read(self, path, length, offset, fh):
-        return io.read(self.cry, self.__real_path(path), length, offset)
+        return self.io.read(self.__real_path(path), length, offset)
 
     @debug_log
     def write(self, path, buf, offset, fh):
-        return io.write(self.cry, self.__real_path(path), buf, offset)
+        return self.io.write(self.__real_path(path), buf, offset)
     
     @debug_log
     def truncate(self, path, length, fh=None):
-        return io.truncate(self.cry, self.__real_path(path), length)
+        return self.io.truncate(self.__real_path(path), length)
     
     @debug_log
     def flush(self, path, fh):
