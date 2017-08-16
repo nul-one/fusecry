@@ -146,14 +146,25 @@ class FusecryIO(object):
         return None
 
     def fsck(self, path):
-        errors = False
+        errors = []
         total_files = sum([ len(f) for r,d,f in os.walk(path) ])
-        print("Fusecry FSCK: checking {} files...".format(total_files))
+        files_checked = 0
         for r,d,f in os.walk(path):
             for file_name in f:
+                print(" Fusecry FSCK: checking {}/{} files. {}\r".format(
+                    files_checked,
+                    total_files,
+                    ("Errors: " + str(len(errors))) if len(errors) else "No errors.",
+                    ), end="")
                 error = self.fsck_file(os.path.join(r,file_name))
+                files_checked += 1
                 if error:
-                    errors = True
-                    print(error)
-        return errors
+                    errors.append(error)
+        if len(errors):
+            print("\nFSCK completed with errors:")
+            for error in errors:
+                print(error)
+        else:
+            print("\nFSCK complete. No errors detected.")
+        return bool(len(errors))
 

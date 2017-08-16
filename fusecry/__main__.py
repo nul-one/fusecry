@@ -71,7 +71,7 @@ def parse_args():
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
     parser_mount.add_argument(
-        '--ignore-ic', action="store_true",
+        '-i', '--ignore-ic', action="store_true",
         help="Don't fail on integrity check error.")
     parser_mount.add_argument(
         '-d', '--debug', action="store_true",
@@ -113,7 +113,7 @@ def parse_args():
         'out_file', type=str, action="store",
         help='Decrypted file output.')
     parser_decrypt.add_argument(
-        '--ignore-ic', action="store_true",
+        '-i', '--ignore-ic', action="store_true",
         help="Don't fail on integrity check error.")
     parser_decrypt.add_argument(
         '-p', '--password', action="store",
@@ -127,7 +127,7 @@ def parse_args():
         'toggle_files', type=str, action="store", nargs="+",
         help='Input raw file or encrypted .fcry file.')
     parser_toggle.add_argument(
-        '--ignore-ic', action="store_true",
+        '-i', '--ignore-ic', action="store_true",
         help="Don't fail on integrity check error.")
     parser_toggle .add_argument(
         '-p', '--password', action="store",
@@ -141,7 +141,7 @@ def parse_args():
         'root', type=str, action="store",
         help='Root dir of fusecry fs that is not mounted.')
     parser_fsck.add_argument(
-        '--ignore-ic', action="store_true",
+        '-i', '--ignore-ic', action="store_true",
         help="Don't fail on integrity check error.")
     parser_fsck.add_argument(
         '-p', '--password', action="store",
