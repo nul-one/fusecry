@@ -21,7 +21,9 @@ class FusecryIO(object):
         self.cry = cry
         self.ignore_ic = ignore_ic
         self.cs = config.enc.chunk_size
-        self.ms = config.enc.key_size+2*config.enc.iv_size+config.enc.hash_size
+        self.ms = ( config.enc.key_size
+                    + 2 * config.enc.iv_size
+                    + config.enc.hash_size )
 
     def check_ic_pass(self, path, check):
         if not self.ignore_ic:
@@ -119,15 +121,18 @@ class FusecryIO(object):
                     attr['st_size'] = self.filesize(path)
                 else:
                     ratio = self.cs / (self.ms+self.cs)
-                    attr['st_size'] = \
-                        int((attr['st_size']-struct.calcsize('Q'))*ratio)
+                    attr['st_size'] = int(
+                        (attr['st_size']-struct.calcsize('Q'))*ratio )
         return attr
     
     def touch(self, path, mode=0o644, dir_fd=None, **kwargs):
         flags = os.O_CREAT | os.O_APPEND
-        with os.fdopen(os.open(path, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
-            os.utime(f.fileno() if os.utime in os.supports_fd else path,
-                dir_fd=None if os.supports_fd else dir_fd, **kwargs)
+        with os.fdopen(
+                os.open(path, flags=flags, mode=mode, dir_fd=dir_fd) ) as f:
+            os.utime(
+                f.fileno() if os.utime in os.supports_fd else path,
+                dir_fd=None if os.supports_fd else dir_fd,
+                **kwargs )
 
     def fsck_file(self, path):
         size = 0
@@ -154,8 +159,9 @@ class FusecryIO(object):
                 print(" Fusecry FSCK: checking {}/{} files. {}\r".format(
                     files_checked,
                     total_files,
-                    ("Errors: " + str(len(errors))) if len(errors) else "No errors.",
-                    ), end="")
+                    ( "Errors: " + str(len(errors))
+                        if len(errors) else "No errors." ),
+                    ), end="" )
                 error = self.fsck_file(os.path.join(r,file_name))
                 files_checked += 1
                 if error:

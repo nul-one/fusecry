@@ -121,7 +121,7 @@ def parse_args():
 
     parser_toggle = subparsers.add_parser(
         'toggle',
-        description='Ecrypt raw or decrypt .fcry files and delete the original.'
+        description='Ecrypt/decrypt raw/.fcry files and delete the original.'
         )
     parser_toggle .add_argument(
         'toggle_files', type=str, action="store", nargs="+",
