@@ -40,7 +40,7 @@ class Cry(object):
         ks = config.enc.key_size
         vs = config.enc.iv_size
         if not enc_chunk:
-            return b''
+            return b'', False
         secret_iv = enc_chunk[poz:poz+vs]; poz+=vs
         encrypted_random_key = enc_chunk[poz:poz+ks]; poz+=ks
         encrypted_random_iv = enc_chunk[poz:poz+vs]; poz+=vs

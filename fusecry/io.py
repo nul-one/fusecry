@@ -5,6 +5,7 @@ Fusecry IO functions.
 import fusecry.config as config
 import os
 import struct
+import sys
 
 class FusecryException(Exception):
     pass
@@ -32,43 +33,32 @@ class FusecryIO(object):
 
     def read(self, path, length, offset):
         buf = b''
-        length = min(length, self.filesize(path) - offset)
-        if length <= 0:
+        size = self.filesize(path)
+        rlen = min(length, size - offset)
+        if rlen <= 0:
             return buf
         ncc = int(offset / self.cs) # number of untouched chunks
         sb = offset % self.cs # skip bytes in first crypto chunk
         with open(path,'rb') as f:
             f.seek(ncc*(self.ms+self.cs))
-            while len(buf) < (sb+length):
-                data = f.read(self.ms+self.cs)
-                data_len = len(data)-self.ms
-                if data_len <= struct.calcsize('Q'):
-                    break
-                if data_len % config.enc.aes_block:
-                    data = data[:-(data_len%config.enc.aes_block)]
-                dec, ic_pass = self.cry.dec(data)
+            while len(buf) < (sb+rlen):
+                cdata = f.read(self.ms+self.cs)
+                cdata_len = len(cdata)-self.ms
+                if cdata_len % config.enc.aes_block:
+                    cdata = cdata[:-(cdata_len % config.enc.aes_block)]
+                dec, ic_pass = self.cry.dec(cdata)
                 self.check_ic_pass(path, ic_pass)
                 buf += dec
-        return buf[sb:sb+length]
+        return buf[sb:sb+rlen]
         
     def write(self, path, buf, offset):
         xbuf = b''
-        old_crypto=b''
         ncc = int(offset / self.cs) # number of untouched chunks
         if offset > self.filesize(path):
             return 0
         if offset % self.cs:
-            # Decrypt last block and prepend it to xbuf
-            with open(path,'rb') as f:
-                f.seek(ncc*(self.ms+self.cs))
-                data = f.read(self.ms+self.cs)
-                data_len = len(data)-self.ms
-                if data_len > struct.calcsize('Q'):
-                    if data_len % config.enc.aes_block:
-                        data = data[:-(data_len%config.enc.aes_block)]
-                    dec, ic_pass = self.cry.dec(data)
-                    self.check_ic_pass(path, ic_pass)
-                    xbuf = dec[:offset%self.cs] + buf
+            dec = self.read(path, offset % self.cs, ncc * self.cs)
+            xbuf = dec + buf
         else:
             # just right block size
             xbuf = buf
@@ -106,8 +96,11 @@ class FusecryIO(object):
             if file_end:
                 f.seek(file_end-struct.calcsize('Q'))
                 size = struct.unpack('<Q', f.read(struct.calcsize('Q')))[0]
-            if size < 0 or size > os.stat(path).st_size:
-                raise FileSizeException("file: '{}'".format(path))
+            st_size = os.stat(path).st_size
+            if size < 0 or size > st_size:
+                raise FileSizeException(
+                    "file: '{}' size: {} st_size: {}".format(
+                        path, size, st_size))
             return size
     
     def attr(self, path):
