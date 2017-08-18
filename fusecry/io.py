@@ -17,7 +17,6 @@ class FileSizeException(FusecryException):
     pass
 
 class FusecryIO(object):
-
     def __init__(self, cry, ignore_ic=False):
         self.cry = cry
         self.ignore_ic = ignore_ic
@@ -33,7 +32,7 @@ class FusecryIO(object):
 
     def read(self, path, length, offset):
         buf = b''
-        size = self.filesize(path)
+        size, _ = self.filesize(path)
         rlen = min(length, size - offset)
         if rlen <= 0:
             return buf
@@ -54,7 +53,7 @@ class FusecryIO(object):
     def write(self, path, buf, offset):
         xbuf = b''
         ncc = int(offset / self.cs) # number of untouched chunks
-        if offset > self.filesize(path):
+        if offset > self.filesize(path)[0]:
             return 0
         if offset % self.cs:
             dec = self.read(path, offset % self.cs, ncc * self.cs)
@@ -90,18 +89,37 @@ class FusecryIO(object):
                 f.truncate(0)
     
     def filesize(self, path):
+        def calc_max_size(st_size):
+            size = st_size - struct.calcsize('Q')
+            if size < 0:
+                return 0
+            max_size = int(size/(self.ms+self.cs))*self.cs
+            last_chunk = size%(self.ms+self.cs) - self.ms
+            if last_chunk > 0:
+                max_size += last_chunk
+            return max_size
+        def create_exception(path, size, st_size):
+            return FileSizeException(
+                "file: '{}' size: {} st_size: {}".format(
+                    path, size, st_size))
+        st_size = os.stat(path).st_size
+        max_size = calc_max_size(st_size)
+        min_size = max_size - config.enc.aes_block + 1
+        exception = None
         with open(path, 'rb') as f:
             file_end = f.seek(0,os.SEEK_END)
             size = 0
             if file_end:
                 f.seek(file_end-struct.calcsize('Q'))
-                size = struct.unpack('<Q', f.read(struct.calcsize('Q')))[0]
-            st_size = os.stat(path).st_size
-            if size < 0 or size > st_size:
-                raise FileSizeException(
-                    "file: '{}' size: {} st_size: {}".format(
-                        path, size, st_size))
-            return size
+                try:
+                    size = struct.unpack('<Q', f.read(struct.calcsize('Q')))[0]
+                except struct.error as e:
+                    exception = create_exception(path, size, st_size)
+                    size = -1
+            if size < min_size or size > max_size:
+                exception = create_exception(path, size, st_size)
+                size = min_size
+            return size, exception
     
     def attr(self, path):
         st = os.lstat(path)
@@ -111,7 +129,7 @@ class FusecryIO(object):
         if os.path.isfile(path):
             if attr['st_size']:
                 if os.access(path, os.R_OK):
-                    attr['st_size'] = self.filesize(path)
+                    attr['st_size'], _ = self.filesize(path)
                 else:
                     ratio = self.cs / (self.ms+self.cs)
                     attr['st_size'] = int(
@@ -129,10 +147,9 @@ class FusecryIO(object):
 
     def fsck_file(self, path):
         size = 0
-        try:
-            size = self.filesize(path)
-        except Exception as e:
-            return "{}: {}".format(type(e), e)
+        size, exception = self.filesize(path)
+        if exception:
+            return "{}: {}".format(type(exception), exception)
         if not self.ignore_ic:
             try:
                 offset = 0
@@ -149,21 +166,21 @@ class FusecryIO(object):
         files_checked = 0
         for r,d,f in os.walk(path):
             for file_name in f:
-                print(" Fusecry FSCK: checking {}/{} files. {}\r".format(
+                files_checked += 1
+                print("Fusecry FSCK: checking {}/{} files. {}".format(
                     files_checked,
                     total_files,
-                    ( "Errors: " + str(len(errors))
-                        if len(errors) else "No errors." ),
-                    ), end="" )
+                    ( "Errors so far: " + str(len(errors))
+                        if len(errors) else "No errors so far." ),
+                    ))
                 error = self.fsck_file(os.path.join(r,file_name))
-                files_checked += 1
                 if error:
                     errors.append(error)
         if len(errors):
-            print("\nFSCK completed with errors:")
+            print("\nFSCK completed with errors:\n")
             for error in errors:
                 print(error)
         else:
-            print("\nFSCK complete. No errors detected.")
+            print("\nFSCK complete. No errors detected.\n")
         return bool(len(errors))
 

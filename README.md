@@ -28,8 +28,9 @@ features
 -------------------------
 
 - mount
-- integration check
 - encrypt/decrypt single files
+- access time integrity check
+- filesystem check
 
 usage
 -------------------------
@@ -48,6 +49,12 @@ Data copied to mount point will remain encrypted in source directory.
 Toggle will encrypt raw files and decrypt encrypted files and delete originals
 in the process. It asumes files with '.fcry' extension are encrypted ones.
 
+### fsck
+
+`fusecry fsck ROOT`
+ROOT is the source dir that is to be mounted. Make sure it is not mounted
+during fsck or you might get false-positive error detection.
+
 known deficiencies and limitations
 -------------------------
 
@@ -57,7 +64,6 @@ known deficiencies and limitations
 future plans and missing features (in no particular order)
 -------------------------
 
-- threading
 - choice and detection of chunk sizes
 - password change (bulk re-encryption)
 

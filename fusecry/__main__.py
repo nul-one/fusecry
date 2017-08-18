@@ -43,7 +43,6 @@ class FuseDaemon(Daemon):
                 self.debug
                 ),
             self.mountpoint,
-            nothreads=True,
             foreground=True
             )
 
@@ -186,7 +185,6 @@ def main():
                     args.debug
                     ),
                 mountpoint,
-                nothreads=True,
                 foreground=True
                 )
         else:
