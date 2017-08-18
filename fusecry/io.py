@@ -2,8 +2,11 @@
 Fusecry IO functions.
 """
 
+from datetime import datetime
 import fusecry.config as config
+import itertools
 import os
+import string
 import struct
 import sys
 
@@ -183,4 +186,35 @@ class FusecryIO(object):
         else:
             print("\nFSCK complete. No errors detected.\n")
         return bool(len(errors))
+
+    def bruteforce(self, path, allowed_chars=string.printable):
+        def index_to_char(index):
+            if index >= len(allowed_chars):
+                raise ValueError("Index out of range.")
+            else:
+                return allowed_chars[index]
+        cdata = None
+        with open(path, 'rb') as f:
+            cdata = f.read(self.ms+self.cs)
+            cdata_len = len(cdata)-self.ms
+            if cdata_len % config.enc.aes_block:
+                cdata = cdata[:-(cdata_len % config.enc.aes_block)]
+        pass_length = 0
+        timestamp = datetime.now()
+        while True:
+            pass_length += 1
+            print("Password length increased to {}.".format(pass_length))
+            for p in itertools.product('0123456789', repeat=pass_length):
+                self.cry.password=''.join(p)
+                dec, ic_pass = self.cry.dec(cdata)
+                if ic_pass:
+                    print("Password found:")
+                    print(self.cry.password)
+                    return
+            prev_timestamp = timestamp
+            timestamp = datetime.now()
+            print("  - time: {}s".format((
+                timestamp-prev_timestamp).total_seconds()))
+            print("  - last pass: {}".format(self.cry.password))
+
 

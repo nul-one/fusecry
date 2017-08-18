@@ -15,6 +15,7 @@ import argcomplete
 import argparse
 import os
 import signal
+import string
 import sys
 
 def signal_handler(signal, frame):
@@ -132,7 +133,7 @@ def parse_args():
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
 
-    parser_fsck= subparsers.add_parser(
+    parser_fsck = subparsers.add_parser(
         'fsck',
         description='Perform integrity check on all files and print results.'
         )
@@ -145,6 +146,35 @@ def parse_args():
     parser_fsck.add_argument(
         '-p', '--password', action="store",
         help="If not provided, will be asked for password in prompt.")
+
+    parser_bf = subparsers.add_parser(
+        'bf',
+        description='Bruteforce password crack targeting single file.'
+        )
+    parser_bf.add_argument(
+        'in_file', type=str, action="store",
+        help='Input encrypted file for cracking.')
+    parser_bf.add_argument(
+        '--lowercase', action="store_true",
+        help="Add lowercase ASCII letters to list of allowed chars.")
+    parser_bf.add_argument(
+        '--uppercase', action="store_true",
+        help="Add uppercase ASCII letters to list of allowed chars.")
+    parser_bf.add_argument(
+        '--digits', action="store_true",
+        help="Add 0-9 digits to list of allowed chars.")
+    parser_bf.add_argument(
+        '--punctuation', action="store_true",
+        help="Add ASCII punctuation chars to list of allowed chars.")
+    parser_bf.add_argument(
+        '--whitespace', action="store_true",
+        help="Add whitespace chars to list of allowed chars.")
+    parser_bf.add_argument(
+        '-c', '--allowed-chars', type=str, action="store",
+        help="Custom list of allowed chars. Defaults to all printables.")
+    parser_bf.set_defaults(
+        allowed_chars=string.printable,
+    )
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
@@ -222,6 +252,23 @@ def main():
         password = get_secure_password(args.password)
         root = os.path.abspath(args.root)
         io.FusecryIO(cry.Cry(password), args.ignore_ic).fsck(root)
+    elif args.cmd == 'bf':
+        allowed_chars = args.allowed_chars
+        if args.lowercase:
+            allowed_chars += string.ascii_lowercase
+        if args.uppercase:
+            allowed_chars += string.ascii_uppercase
+        if args.digits:
+            allowed_chars += string.digits
+        if args.punctuation:
+            allowed_chars += string.punctuation
+        if args.whitespace:
+            allowed_chars += string.whitespace
+        allowed_chars = list(set(allowed_chars))
+        allowed_chars.sort()
+        allowed_chars = ''.join(allowed_chars)
+        in_file = os.path.abspath(args.in_file)
+        io.FusecryIO(cry.Cry('')).bruteforce(in_file, allowed_chars)
 
 if __name__ == '__main__':
     main()
