@@ -4,17 +4,18 @@ Fusecry encryption functions.
 
 from Crypto import Random
 from Crypto.Cipher import AES 
-from Crypto.Hash import SHA256, MD5 
+from Crypto.Hash import MD5 
+from Crypto.Protocol.KDF import PBKDF2
+from fusecry.securedata import secure
 import fusecry.config as config
 
-
 class Cry(object):
-    def __init__(self, password):
-        self.password = password
+    def __init__(self, password, kdf_salt, kdf_iters):
+        self.ks = config.enc.key_size
+        self.vs = config.enc.iv_size
+        self.aes_key = PBKDF2(str(password), kdf_salt, self.ks, kdf_iters)
 
     def enc(self, chunk):
-        ks = config.enc.key_size
-        vs = config.enc.iv_size
         checksum = MD5.new()
         if not chunk:
             return b''
@@ -22,11 +23,11 @@ class Cry(object):
             chunk += bytes(AES.block_size - len(chunk) % AES.block_size)
         checksum.update(chunk)
         chunk = checksum.digest() + chunk
-        random_key = Random.get_random_bytes(ks)
-        random_iv = Random.get_random_bytes(vs)
+        random_key = Random.get_random_bytes(self.ks)
+        random_iv = Random.get_random_bytes(self.vs)
         random_encryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
-        secret_key = SHA256.new(bytes(str(self.password), 'utf-8')).digest()
-        secret_iv = Random.get_random_bytes(vs)
+        secret_iv = Random.get_random_bytes(self.vs)
+        secret_key = self.aes_key
         secret_encryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
         encrypted_random_key = secret_encryptor.encrypt(random_key)
         encrypted_random_iv = secret_encryptor.encrypt(random_iv)
@@ -37,14 +38,12 @@ class Cry(object):
 
     def dec(self, enc_chunk):
         poz = 0
-        ks = config.enc.key_size
-        vs = config.enc.iv_size
         if not enc_chunk:
             return b'', False
-        secret_iv = enc_chunk[poz:poz+vs]; poz+=vs
-        encrypted_random_key = enc_chunk[poz:poz+ks]; poz+=ks
-        encrypted_random_iv = enc_chunk[poz:poz+vs]; poz+=vs
-        secret_key = SHA256.new(bytes(str(self.password), 'utf-8')).digest()
+        secret_iv = enc_chunk[poz:poz+self.vs]; poz+=self.vs
+        encrypted_random_key = enc_chunk[poz:poz+self.ks]; poz+=self.ks
+        encrypted_random_iv = enc_chunk[poz:poz+self.vs]; poz+=self.vs
+        secret_key = self.aes_key
         secret_decryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
         random_key = secret_decryptor.decrypt(encrypted_random_key)
         random_iv = secret_decryptor.decrypt(encrypted_random_iv)

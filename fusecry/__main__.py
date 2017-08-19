@@ -6,7 +6,7 @@ Main runnable.
 """
 
 from fuse import FUSE
-from fusecry import single, cry, io
+from fusecry import single, io, config
 from fusecry.daemon import Daemon
 from fusecry.filesystem import Fusecry
 from fusecry.securedata import secure
@@ -15,7 +15,6 @@ import argcomplete
 import argparse
 import os
 import signal
-import string
 import sys
 
 def signal_handler(signal, frame):
@@ -26,8 +25,7 @@ class FuseDaemon(Daemon):
     """
     Daemonize fuse process.
     """
-    def __init__(self, pidfile, root, mountpoint, password, ignore_ic,
-            debug):
+    def __init__(self, pidfile, root, mountpoint, password, ignore_ic, debug):
         self.pidfile = pidfile
         self.root = root
         self.mountpoint = mountpoint
@@ -53,128 +51,91 @@ def parse_args():
         description="Encrypted filesystem based on FUSE."
         )
     subparsers = parser.add_subparsers(
-        description='(use each command with -h for more help)',
-        dest='cmd',
+        description="(use each command with -h for more help)",
+        dest="cmd",
         )
 
     parser_mount = subparsers.add_parser(
-        'mount',
-        description='Mount source dir to local directory.'
+        "mount",
+        description="Mount source dir to local directory."
         )
     parser_mount.add_argument(
-        'root', type=str, action="store",
-        help='Source directory with encrypted files.')
+        "root", type=str, action="store",
+        help="Source directory with encrypted files.")
     parser_mount.add_argument(
-        'mountpoint', type=str, action="store",
-        help='Mountpoint.')
+        "mountpoint", type=str, action="store",
+        help="Mountpoint.")
     parser_mount.add_argument(
-        '-p', '--password', action="store",
+        "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
     parser_mount.add_argument(
-        '-i', '--ignore-ic', action="store_true",
+        "-i", "--ignore-ic", action="store_true",
         help="Don't fail on integrity check error.")
     parser_mount.add_argument(
-        '-d', '--debug', action="store_true",
+        "-d", "--debug", action="store_true",
         help="Enable debug mode with print output of each fs action.")
     parser_mount.set_defaults(
         debug=False,
     )
 
     parser_umount = subparsers.add_parser(
-        'umount',
-        description='Unmount the mountpoint.'
+        "umount",
+        description="Unmount the mountpoint."
         )
     parser_umount.add_argument(
-        'mountpoint', type=str, action="store",
-        help='Mountpoint.')
+        "mountpoint", type=str, action="store",
+        help="Mountpoint.")
 
     parser_encrypt = subparsers.add_parser(
-        'encrypt',
-        description='Encrypt single file.'
+        "encrypt",
+        description="Encrypt single file."
         )
     parser_encrypt.add_argument(
-        'in_file', type=str, action="store",
-        help='Input file for encryption.')
+        "in_file", type=str, action="store",
+        help="Input file for encryption.")
     parser_encrypt.add_argument(
-        'out_file', type=str, action="store",
-        help='Encrypted file output.')
+        "out_file", type=str, action="store",
+        help="Encrypted file output.")
     parser_encrypt.add_argument(
-        '-p', '--password', action="store",
+        "-c", "--conf", type=str, action="store", required=True,
+        help="FuseCry configuration file. Will be created if doesn't exist")
+    parser_encrypt.add_argument(
+        "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
 
     parser_decrypt = subparsers.add_parser(
-        'decrypt',
-        description='Decrypt single file.'
+        "decrypt",
+        description="Decrypt single file."
         )
     parser_decrypt.add_argument(
-        'in_file', type=str, action="store",
-        help='Input file for decryption.')
+        "in_file", type=str, action="store",
+        help="Input file for decryption.")
     parser_decrypt.add_argument(
-        'out_file', type=str, action="store",
-        help='Decrypted file output.')
+        "out_file", type=str, action="store",
+        help="Decrypted file output.")
     parser_decrypt.add_argument(
-        '-i', '--ignore-ic', action="store_true",
+        "-c", "--conf", type=str, action="store", required=True,
+        help="FuseCry configuration file. Will be created if doesn't exist")
+    parser_decrypt.add_argument(
+        "-i", "--ignore-ic", action="store_true",
         help="Don't fail on integrity check error.")
     parser_decrypt.add_argument(
-        '-p', '--password', action="store",
-        help="If not provided, will be asked for password in prompt.")
-
-    parser_toggle = subparsers.add_parser(
-        'toggle',
-        description='Ecrypt/decrypt raw/.fcry files and delete the original.'
-        )
-    parser_toggle .add_argument(
-        'toggle_files', type=str, action="store", nargs="+",
-        help='Input raw file or encrypted .fcry file.')
-    parser_toggle.add_argument(
-        '-i', '--ignore-ic', action="store_true",
-        help="Don't fail on integrity check error.")
-    parser_toggle .add_argument(
-        '-p', '--password', action="store",
+        "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
 
     parser_fsck = subparsers.add_parser(
-        'fsck',
-        description='Perform integrity check on all files and print results.'
+        "fsck",
+        description="Perform integrity check on all files and print results."
         )
     parser_fsck.add_argument(
-        'root', type=str, action="store",
-        help='Root dir of fusecry fs that is not mounted.')
+        "root", type=str, action="store",
+        help="Root dir of fusecry fs that is not mounted.")
     parser_fsck.add_argument(
-        '-i', '--ignore-ic', action="store_true",
+        "-i", "--ignore-ic", action="store_true",
         help="Don't fail on integrity check error.")
     parser_fsck.add_argument(
-        '-p', '--password', action="store",
+        "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
-
-    parser_bf = subparsers.add_parser(
-        'bf',
-        description='Bruteforce password crack targeting single file.'
-        )
-    parser_bf.add_argument(
-        'in_file', type=str, action="store",
-        help='Input encrypted file for cracking.')
-    parser_bf.add_argument(
-        '--lowercase', action="store_true",
-        help="Add lowercase ASCII letters to list of allowed chars.")
-    parser_bf.add_argument(
-        '--uppercase', action="store_true",
-        help="Add uppercase ASCII letters to list of allowed chars.")
-    parser_bf.add_argument(
-        '--digits', action="store_true",
-        help="Add 0-9 digits to list of allowed chars.")
-    parser_bf.add_argument(
-        '--punctuation', action="store_true",
-        help="Add ASCII punctuation chars to list of allowed chars.")
-    parser_bf.add_argument(
-        '--whitespace', action="store_true",
-        help="Add whitespace chars to list of allowed chars.")
-    parser_bf.add_argument(
-        '-c', '--allowed-chars', type=str, action="store",
-        help="Custom list of allowed chars. Defaults to all printables.")
-    parser_bf.set_defaults(
-        allowed_chars=string.printable,
-    )
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
@@ -238,37 +199,25 @@ def main():
         print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
         password = get_secure_password_twice(args.password)
-        single.encrypt(cry.Cry(password), args.in_file, args.out_file)
+        conf = os.path.abspath(args.conf)
+        single.encrypt(
+            io.make_io(password, conf, False),
+            args.in_file,
+            args.out_file
+            )
     elif args.cmd == 'decrypt':
         password = get_secure_password(args.password)
-        single.decrypt(cry.Cry(password), args.in_file, args.out_file,
-            args.ignore_ic)
-    elif args.cmd == 'toggle':
-        password = get_secure_password_twice(args.password)
-        toggle_cry = cry.Cry(password)
-        for path in args.toggle_files:
-            single.toggle(toggle_cry, path, args.ignore_ic, info=True)
+        conf = os.path.abspath(args.conf)
+        single.decrypt(
+            io.make_io(password, conf, args.ignore_ic),
+            args.in_file,
+            args.out_file
+            )
     elif args.cmd == 'fsck':
         password = get_secure_password(args.password)
         root = os.path.abspath(args.root)
-        io.FusecryIO(cry.Cry(password), args.ignore_ic).fsck(root)
-    elif args.cmd == 'bf':
-        allowed_chars = args.allowed_chars
-        if args.lowercase:
-            allowed_chars += string.ascii_lowercase
-        if args.uppercase:
-            allowed_chars += string.ascii_uppercase
-        if args.digits:
-            allowed_chars += string.digits
-        if args.punctuation:
-            allowed_chars += string.punctuation
-        if args.whitespace:
-            allowed_chars += string.whitespace
-        allowed_chars = list(set(allowed_chars))
-        allowed_chars.sort()
-        allowed_chars = ''.join(allowed_chars)
-        in_file = os.path.abspath(args.in_file)
-        io.FusecryIO(cry.Cry('')).bruteforce(in_file, allowed_chars)
+        conf = os.path.join(root, config.enc.conf)
+        io.make_io(password, conf, args.ignore_ic).fsck(root)
 
 if __name__ == '__main__':
     main()

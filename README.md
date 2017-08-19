@@ -1,3 +1,4 @@
+
 fusecry 
 ==================================================
 [![Build Status](https://travis-ci.org/phlogisto/fusecry.png)](https://travis-ci.org/phlogisto/fusecry)
@@ -29,7 +30,7 @@ features
 
 - mount
 - encrypt/decrypt single files
-- access time integrity check
+- real time integrity check
 - filesystem check
 
 usage
@@ -43,11 +44,10 @@ Data copied to mount point will remain encrypted in source directory.
 
 ### single file encryption
 
-`fusecry encrypt INPUT_FILE OUTPUT_FILE`  
-`fusecry decrypt INPUT_FILE OUTPUT_FILE`  
-`fusecry toggle TOGGLE_FILE [TOGGLE_FILE [TOGGLE_FILE ...]]`  
-Toggle will encrypt raw files and decrypt encrypted files and delete originals
-in the process. It asumes files with '.fcry' extension are encrypted ones.
+`fusecry encrypt INPUT_FILE OUTPUT_FILE -c FUSECRY_MOUNT_SETTINGS`  
+`fusecry decrypt INPUT_FILE OUTPUT_FILE -c FUSECRY_MOUNT_SETTINGS`  
+FUSECRY\_MOUNT\_SETTINGS is stored in ROOT directory. If you call the command
+without existing settings file, it will be created.
 
 ### fsck
 
@@ -59,11 +59,11 @@ known deficiencies and limitations
 -------------------------
 
 - file names are not being encrypted by design
-- block size is fixed to 4096 (will become option to change)
+- block size is fixed to 4096
 
 future plans and missing features (in no particular order)
 -------------------------
 
-- choice and detection of chunk sizes
+- choice and detection of block sizes
 - password change (bulk re-encryption)
 
