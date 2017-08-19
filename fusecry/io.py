@@ -16,7 +16,7 @@ class FileSizeException(FusecryException):
     pass
 
 def make_io(password, conf, ignore_ic):
-    kdf_salt, kdf_iters = config.configure(conf)
+    kdf_salt, kdf_iters = config.configure(conf) if conf else (b'',0)
     return FusecryIO(cry.Cry(password, kdf_salt, kdf_iters), ignore_ic)
 
 class FusecryIO(object):

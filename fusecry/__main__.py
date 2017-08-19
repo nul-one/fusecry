@@ -97,11 +97,14 @@ def parse_args():
         "out_file", type=str, action="store",
         help="Encrypted file output.")
     parser_encrypt.add_argument(
-        "-c", "--conf", type=str, action="store", required=True,
-        help="FuseCry configuration file. Will be created if doesn't exist")
+        "-c", "--conf", type=str, action="store",
+        help="Specify or create FuseCry configuration file.")
     parser_encrypt.add_argument(
         "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
+    parser_encrypt.set_defaults(
+        conf = None,
+    )
 
     parser_decrypt = subparsers.add_parser(
         "decrypt",
@@ -114,14 +117,17 @@ def parse_args():
         "out_file", type=str, action="store",
         help="Decrypted file output.")
     parser_decrypt.add_argument(
-        "-c", "--conf", type=str, action="store", required=True,
-        help="FuseCry configuration file. Will be created if doesn't exist")
+        "-c", "--conf", type=str, action="store",
+        help="Specify or create FuseCry configuration file.")
     parser_decrypt.add_argument(
         "-i", "--ignore-ic", action="store_true",
         help="Don't fail on integrity check error.")
     parser_decrypt.add_argument(
         "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
+    parser_decrypt.set_defaults(
+        conf = None,
+    )
 
     parser_fsck = subparsers.add_parser(
         "fsck",
@@ -199,7 +205,7 @@ def main():
         print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
         password = get_secure_password_twice(args.password)
-        conf = os.path.abspath(args.conf)
+        conf = os.path.abspath(args.conf) if args.conf else None
         single.encrypt(
             io.make_io(password, conf, False),
             args.in_file,
@@ -207,7 +213,7 @@ def main():
             )
     elif args.cmd == 'decrypt':
         password = get_secure_password(args.password)
-        conf = os.path.abspath(args.conf)
+        conf = os.path.abspath(args.conf) if args.conf else None
         single.decrypt(
             io.make_io(password, conf, args.ignore_ic),
             args.in_file,

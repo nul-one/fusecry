@@ -4,6 +4,9 @@ Generic linux daemon base class
 
 import sys, os, time, atexit, signal
 
+#DIE_SIGNAL = signal.SIGTERM
+DIE_SIGNAL = signal.SIGINT
+
 class Daemon:
     """A generic daemon class.
 
@@ -100,7 +103,7 @@ class Daemon:
         # Try killing the daemon process    
         try:
             while 1:
-                os.kill(pid, signal.SIGTERM)
+                os.kill(pid, DIE_SIGNAL)
                 time.sleep(0.1)
         except OSError as err:
             e = str(err.args)
