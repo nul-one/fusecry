@@ -5,7 +5,6 @@ Fusecry FUSE operations.
 from datetime import datetime
 from fuse import FuseOSError, Operations
 from fusecry import config
-from fusecry import io
 import errno
 import os
 
@@ -23,11 +22,11 @@ def debug_log(func):
     return function_wrapper
 
 class Fusecry(Operations):
-    def __init__(self, root, password, ignore_ic=False, debug=False):
+    def __init__(self, root, io, debug=False):
         self.root = root
         self.debug = debug
         self.conf = os.path.join(self.root, config.enc.conf)
-        self.io = io.make_io(password, self.conf, ignore_ic)
+        self.io = io
 
     def __real_path(self, path):
         if path.startswith(os.path.sep):

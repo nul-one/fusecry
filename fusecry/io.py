@@ -2,9 +2,12 @@
 Fusecry IO functions.
 """
 
+from Crypto import Random
 from fusecry import config, cry
+from random import randint
 import os
 import struct
+
 
 class FusecryException(Exception):
     pass
@@ -15,10 +18,6 @@ class IntegrityCheckException(FusecryException):
 class FileSizeException(FusecryException):
     pass
 
-def make_io(password, conf, ignore_ic):
-    kdf_salt, kdf_iters = config.configure(conf) if conf else (b'',0)
-    return FusecryIO(cry.Cry(password, kdf_salt, kdf_iters), ignore_ic)
-
 class FusecryIO(object):
     def __init__(self, cry, ignore_ic=False):
         self.cry = cry
@@ -27,6 +26,7 @@ class FusecryIO(object):
         self.ms = ( config.enc.key_size
                     + 2 * config.enc.iv_size
                     + config.enc.hash_size )
+        self.ss = struct.calcsize('Q')
 
     def check_ic_pass(self, path, check):
         if not self.ignore_ic:
@@ -36,6 +36,7 @@ class FusecryIO(object):
     def read(self, path, length, offset):
         buf = b''
         size, _ = self.filesize(path)
+        st_size = os.stat(path).st_size
         rlen = min(length, size - offset)
         if rlen <= 0:
             return buf
@@ -43,7 +44,7 @@ class FusecryIO(object):
         sb = offset % self.cs # skip bytes in first crypto chunk
         with open(path,'rb') as f:
             f.seek(ncc*(self.ms+self.cs))
-            while len(buf) < (sb+rlen):
+            while len(buf) < (sb+rlen) and f.tell() < st_size - self.ss:
                 cdata = f.read(self.ms+self.cs)
                 cdata_len = len(cdata)-self.ms
                 if cdata_len % config.enc.aes_block:
@@ -71,8 +72,8 @@ class FusecryIO(object):
             done_length = 0
             while done_length < len(xbuf):
                 chunk = xbuf[done_length:self.cs]
-                done_length += self.cs
-                if not chunk:
+                done_length += len(chunk)
+                if not len(chunk):
                     break
                 f.write(self.cry.enc(chunk))
             f.write(struct.pack('<Q', offset + len(buf)))
@@ -93,7 +94,7 @@ class FusecryIO(object):
     
     def filesize(self, path):
         def calc_max_size(st_size):
-            size = st_size - struct.calcsize('Q')
+            size = st_size - self.ss
             if size < 0:
                 return 0
             max_size = int(size/(self.ms+self.cs))*self.cs
@@ -113,9 +114,9 @@ class FusecryIO(object):
             file_end = f.seek(0,os.SEEK_END)
             size = 0
             if file_end:
-                f.seek(file_end-struct.calcsize('Q'))
+                f.seek(file_end-self.ss)
                 try:
-                    size = struct.unpack('<Q', f.read(struct.calcsize('Q')))[0]
+                    size = struct.unpack('<Q', f.read(self.ss))[0]
                 except struct.error as e:
                     exception = create_exception(path, size, st_size)
                     size = -1
@@ -135,8 +136,7 @@ class FusecryIO(object):
                     attr['st_size'], _ = self.filesize(path)
                 else:
                     ratio = self.cs / (self.ms+self.cs)
-                    attr['st_size'] = int(
-                        (attr['st_size']-struct.calcsize('Q'))*ratio )
+                    attr['st_size'] = int((attr['st_size']-self.ss)*ratio)
         return attr
     
     def touch(self, path, mode=0o644, dir_fd=None, **kwargs):
@@ -188,4 +188,45 @@ class FusecryIO(object):
         else:
             print("\nFSCK complete. No errors detected.\n")
         return bool(len(errors))
+
+
+class PasswordFusecryIO(FusecryIO):
+    def __init__(self, password, conf_path=None, ignore_ic=False):
+        salt_size = config.enc.kdf_salt_size
+        kdf_salt = None
+        kdf_iters = None
+        if os.path.isfile(conf_path):
+            with open(conf_path, 'rb') as f:
+                kdf_salt = f.read(config.enc.kdf_salt_size)
+                kdf_iters = struct.unpack('<Q', f.read(self.ss))[0]
+        else:
+            kdf_salt = Random.get_random_bytes(config.enc.kdf_salt_size)
+            kdf_iters = randint(*config.enc.kdf_iter_range)
+            with open(conf_path, 'w+b') as f:
+                print("Generating new conf: {}".format(conf_path))
+                print("It's safe to be shared. Decryption won't work if lost.")
+                f.write(kdf_salt)
+                f.write(struct.pack('<Q', kdf_iters))
+        crypto = cry.PasswordCrypto(password, kdf_salt, kdf_iters)
+        super().__init__(crypto, ignore_ic)
+
+
+class RSAFusecryIO(FusecryIO):
+    def __init__(self, key_path, conf_path=None, ignore_ic=False):
+        crypto = None
+        rsa_key = None
+        with open(key_path, 'rb') as f:
+            rsa_key = f.read()
+        if os.path.isfile(conf_path):
+            with open(conf_path, 'rb') as f:
+                enc_aes = f.read()
+                crypto, _ = cry.get_rsa_cry(rsa_key, enc_aes)
+        else:
+            crypto, enc_aes = cry.get_rsa_cry(rsa_key)
+            self.touch(conf_path)
+            with open(conf_path, 'w+b') as f:
+                print("Generating new conf: {}".format(conf_path))
+                print("It's safe to be shared. Decryption won't work if lost.")
+                f.write(enc_aes)
+        super().__init__(crypto, ignore_ic)
 
