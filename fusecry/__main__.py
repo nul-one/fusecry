@@ -73,12 +73,16 @@ def parse_args():
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
     parser_mount.add_argument(
+        "-n", "--no-pid", action="store_true",
+        help="Without local pidfile (have to use 'fusermount' to unmount).")
+    parser_mount.add_argument(
         "-d", "--debug", action="store_true",
         help="Enable debug mode with print output of each fs action.")
     parser_mount.set_defaults(
         password = None,
         key=None,
         conf = None,
+        no_pid = False,
         debug=False,
     )
 
@@ -236,14 +240,27 @@ def main():
                 foreground=True
                 )
         else:
-            pidfile = os.path.join(
-                os.path.dirname(mountpoint),
-                '.'+os.path.basename(mountpoint)+'.fcry.pid'
-                )
-            print(pidfile)
-            fuse_daemon = FuseDaemon(
-                pidfile, root, mountpoint, fcio, args.debug)
-            fuse_daemon.start()
+            if args.no_pid:
+                print("To unmount: 'fusermount -u {}'".format(mountpoint))
+                FUSE(
+                    Fusecry(
+                        root,
+                        fcio,
+                        args.debug
+                        ),
+                    mountpoint,
+                    foreground=False
+                    )
+            else:
+                pidfile = os.path.join(
+                    os.path.dirname(mountpoint),
+                    '.'+os.path.basename(mountpoint)+'.fcry.pid'
+                    )
+                print("pidfile: '{}'".format(pidfile))
+                print("To unmount: 'fusercry umount {}'".format(mountpoint))
+                fuse_daemon = FuseDaemon(
+                    pidfile, root, mountpoint, fcio, args.debug)
+                fuse_daemon.start()
     elif args.cmd == 'umount':
         mountpoint = os.path.abspath(args.mountpoint)
         pidfile = os.path.join(

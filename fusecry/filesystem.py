@@ -7,6 +7,8 @@ from fuse import FuseOSError, Operations
 from fusecry import config
 import errno
 import os
+import traceback
+
 
 def debug_log(func):
     def function_wrapper(*args, **kwargs):

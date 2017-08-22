@@ -2,9 +2,7 @@
 Fusecry IO functions.
 """
 
-from Crypto import Random
 from fusecry import config, cry
-from random import randint
 import os
 import struct
 
@@ -259,23 +257,19 @@ class FusecryIO(object):
 class PasswordFusecryIO(FusecryIO):
     def __init__(self, password, conf_path=None):
         conf_data = ConfData()
+        crypto = None
         if conf_data.load(conf_path):
             if conf_data.type != 'password':
                 raise BadConfException(
                     "Expected conf type: 'password', but found: '{}'".format(
                         conf_data.type))
+            crypto, _, _, _ = cry.get_password_cry(
+                password, conf_data.kdf_salt, conf_data.kdf_iters)
         else:
-            conf_data.kdf_salt = Random.get_random_bytes(
-                config.enc.kdf_salt_size)
-            conf_data.kdf_iters = randint(*config.enc.kdf_iter_range)
-        crypto = cry.get_password_cry(
-            password,
-            conf_data.kdf_salt,
-            conf_data.kdf_iters)
+            crypto, conf_data.kdf_salt, conf_data.kdf_iters, \
+                conf_data.enc_chunk = cry.get_password_cry(password)
         if not conf_data.type:
             conf_data.type = 'password'
-            conf_data.enc_chunk = crypto.enc(
-                Random.get_random_bytes(config.enc.chunk_size))
             conf_data.save(conf_path)
         else:
             _, ic_pass = crypto.dec(conf_data.enc_chunk)
@@ -295,18 +289,16 @@ class RSAFusecryIO(FusecryIO):
                 raise BadConfException(
                     "Expected conf type: 'rsakey', but found: '{}'".format(
                         conf_data.type))
-            crypto, _, _ = cry.get_rsa_cry(rsa_key, conf_data.enc_aes)
+            crypto, _, _, _ = cry.get_rsa_cry(rsa_key, conf_data.enc_aes)
             try:
                 _, ic_pass = crypto.dec(conf_data.enc_chunk)
             except ValueError:
                 raise BadConfException("RSA key did not match.")
             self.check_ic_pass(conf_path, ic_pass)
         else:
-            crypto, conf_data.rsa_key_size, conf_data.enc_aes =\
-                cry.get_rsa_cry(rsa_key)
+            crypto, conf_data.rsa_key_size, conf_data.enc_aes, \
+                conf_data.enc_chunk = cry.get_rsa_cry(rsa_key)
             conf_data.type = 'rsakey'
-            conf_data.enc_chunk = crypto.enc(
-                Random.get_random_bytes(config.enc.chunk_size))
             conf_data.save(conf_path)
         super().__init__(crypto)
 
