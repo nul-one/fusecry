@@ -17,33 +17,21 @@ def random_string(length):
 ## tests
 
 def test_cry_enc():
-    c = cry.Cry(
-        random_string(15),
-        Random.get_random_bytes(config.enc.kdf_salt_size),
-        1000,
-        )
+    c = cry.Cry(Random.get_random_bytes(config.enc.key_size))
     data = os.urandom(5000)
     assert len(c.enc(data)) % config.enc.aes_block == 0
     assert data != c.enc(data)[:len(data)]
     assert c.enc(data) != c.enc(data)
 
 def test_cry_dec():
-    c = cry.Cry(
-        random_string(15),
-        Random.get_random_bytes(config.enc.kdf_salt_size),
-        1000,
-        )
+    c = cry.Cry(Random.get_random_bytes(config.enc.key_size))
     data = os.urandom(5000)
     dec_data, ic_check = c.dec(c.enc(data))
     assert ic_check
     assert data == dec_data[:len(data)]
 
 def test_cry_bad_ic():
-    c = cry.Cry(
-        random_string(15),
-        Random.get_random_bytes(config.enc.kdf_salt_size),
-        1000,
-        )
+    c = cry.Cry(Random.get_random_bytes(config.enc.key_size))
     data = os.urandom(5000)
     enc_data = c.enc(data)
     bad_enc_data = enc_data[:1000] + b'x' + enc_data[1001:]

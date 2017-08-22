@@ -18,20 +18,87 @@ class IntegrityCheckException(FusecryException):
 class FileSizeException(FusecryException):
     pass
 
+class BadConfException(FusecryException):
+    pass
+
+meta_size = ( config.enc.key_size
+            + 2 * config.enc.iv_size
+            + config.enc.hash_size )
+
+class ConfData(object):
+
+    def save(self, path=None):
+        if path: self.path = path
+        print("Generating new conf: {}".format(self.path))
+        print("It's safe to be shared, but decryption won't work if lost.")
+        if self.type == 'password':
+            fmt = '< 8s {}s I {}s'.format(
+                config.enc.kdf_salt_size,
+                config.enc.chunk_size + meta_size,
+                )
+            with open(self.path, 'w+b') as f:
+                f.write(struct.pack(
+                    fmt,
+                    self.type.encode(),
+                    self.kdf_salt,
+                    self.kdf_iters,
+                    self.enc_chunk,
+                    ))
+        elif self.type == 'rsakey':
+            fmt = '< 8s I {}s {}s'.format(
+                self.rsa_key_size,
+                config.enc.chunk_size + meta_size,
+                )
+            with open(self.path, 'w+b') as f:
+                f.write(struct.pack(
+                    fmt,
+                    self.type.encode(),
+                    self.rsa_key_size,
+                    self.enc_aes,
+                    self.enc_chunk,
+                    ))
+
+    def load(self, path=None):
+        if path: self.path = path
+        if not os.path.isfile(self.path):
+            self.type = None
+            return self.type
+        path_data = b''
+        with open(self.path, 'rb') as f:
+            path_data = f.read()
+        self.type = path_data[:struct.calcsize('<8s')].split(b'\0')[0].decode()
+        if self.type == 'password':
+            # type, kdf_salt, kdf_iters, enc_chunk
+            fmt = '< 8s {}s I {}s'.format(
+                config.enc.kdf_salt_size,
+                config.enc.chunk_size + meta_size,
+                )
+            s = struct.Struct(fmt)
+            _, self.kdf_salt, self.kdf_iters, self.enc_chunk=\
+                s.unpack(path_data)
+        elif self.type == 'rsakey':
+            _, self.rsa_key_size = struct.unpack(
+                '< 8s I', path_data[:struct.calcsize('< 8s I')])
+            # type, rsa_key_size, enc_aes, enc_chunk
+            fmt = '< 8s I {}s {}s'.format(
+                self.rsa_key_size,
+                config.enc.chunk_size + meta_size,
+                )
+            s = struct.Struct(fmt)
+            _, _, self.enc_aes, self.enc_chunk = s.unpack(path_data)
+        return self.type
+
+
 class FusecryIO(object):
-    def __init__(self, cry, ignore_ic=False):
+    def __init__(self, cry):
         self.cry = cry
-        self.ignore_ic = ignore_ic
         self.cs = config.enc.chunk_size
-        self.ms = ( config.enc.key_size
-                    + 2 * config.enc.iv_size
-                    + config.enc.hash_size )
-        self.ss = struct.calcsize('Q')
+        self.ms = meta_size
+        self.ss = struct.calcsize('<Q')
 
     def check_ic_pass(self, path, check):
-        if not self.ignore_ic:
-            if not check:
-                raise IntegrityCheckException("file: '{}'".format(path))
+        if not check:
+            raise IntegrityCheckException("file: '{}'".format(path))
 
     def read(self, path, length, offset):
         buf = b''
@@ -153,14 +220,13 @@ class FusecryIO(object):
         size, exception = self.filesize(path)
         if exception:
             return "{}: {}".format(type(exception), exception)
-        if not self.ignore_ic:
-            try:
-                offset = 0
-                while offset < size:
-                    self.read(path, self.cs, offset)
-                    offset += self.cs
-            except:
-                return "{}: {}".format(type(e), e)
+        try:
+            offset = 0
+            while offset < size:
+                self.read(path, self.cs, offset)
+                offset += self.cs
+        except:
+            return "{}: {}".format(type(e), e)
         return None
 
     def fsck(self, path):
@@ -191,42 +257,56 @@ class FusecryIO(object):
 
 
 class PasswordFusecryIO(FusecryIO):
-    def __init__(self, password, conf_path=None, ignore_ic=False):
-        salt_size = config.enc.kdf_salt_size
-        kdf_salt = None
-        kdf_iters = None
-        if os.path.isfile(conf_path):
-            with open(conf_path, 'rb') as f:
-                kdf_salt = f.read(config.enc.kdf_salt_size)
-                kdf_iters = struct.unpack('<Q', f.read(self.ss))[0]
+    def __init__(self, password, conf_path=None):
+        conf_data = ConfData()
+        if conf_data.load(conf_path):
+            if conf_data.type != 'password':
+                raise BadConfException(
+                    "Expected conf type: 'password', but found: '{}'".format(
+                        conf_data.type))
         else:
-            kdf_salt = Random.get_random_bytes(config.enc.kdf_salt_size)
-            kdf_iters = randint(*config.enc.kdf_iter_range)
-            with open(conf_path, 'w+b') as f:
-                print("Generating new conf: {}".format(conf_path))
-                print("It's safe to be shared. Decryption won't work if lost.")
-                f.write(kdf_salt)
-                f.write(struct.pack('<Q', kdf_iters))
-        crypto = cry.PasswordCrypto(password, kdf_salt, kdf_iters)
-        super().__init__(crypto, ignore_ic)
+            conf_data.kdf_salt = Random.get_random_bytes(
+                config.enc.kdf_salt_size)
+            conf_data.kdf_iters = randint(*config.enc.kdf_iter_range)
+        crypto = cry.get_password_cry(
+            password,
+            conf_data.kdf_salt,
+            conf_data.kdf_iters)
+        if not conf_data.type:
+            conf_data.type = 'password'
+            conf_data.enc_chunk = crypto.enc(
+                Random.get_random_bytes(config.enc.chunk_size))
+            conf_data.save(conf_path)
+        else:
+            _, ic_pass = crypto.dec(conf_data.enc_chunk)
+            self.check_ic_pass(conf_path, ic_pass)
+        super().__init__(crypto)
 
 
 class RSAFusecryIO(FusecryIO):
-    def __init__(self, key_path, conf_path=None, ignore_ic=False):
-        crypto = None
+    def __init__(self, key_path, conf_path=None):
+        conf_data = ConfData()
         rsa_key = None
+        crypto = None
         with open(key_path, 'rb') as f:
             rsa_key = f.read()
-        if os.path.isfile(conf_path):
-            with open(conf_path, 'rb') as f:
-                enc_aes = f.read()
-                crypto, _ = cry.get_rsa_cry(rsa_key, enc_aes)
+        if conf_data.load(conf_path):
+            if conf_data.type != 'rsakey':
+                raise BadConfException(
+                    "Expected conf type: 'rsakey', but found: '{}'".format(
+                        conf_data.type))
+            crypto, _, _ = cry.get_rsa_cry(rsa_key, conf_data.enc_aes)
+            try:
+                _, ic_pass = crypto.dec(conf_data.enc_chunk)
+            except ValueError:
+                raise BadConfException("RSA key did not match.")
+            self.check_ic_pass(conf_path, ic_pass)
         else:
-            crypto, enc_aes = cry.get_rsa_cry(rsa_key)
-            self.touch(conf_path)
-            with open(conf_path, 'w+b') as f:
-                print("Generating new conf: {}".format(conf_path))
-                print("It's safe to be shared. Decryption won't work if lost.")
-                f.write(enc_aes)
-        super().__init__(crypto, ignore_ic)
+            crypto, conf_data.rsa_key_size, conf_data.enc_aes =\
+                cry.get_rsa_cry(rsa_key)
+            conf_data.type = 'rsakey'
+            conf_data.enc_chunk = crypto.enc(
+                Random.get_random_bytes(config.enc.chunk_size))
+            conf_data.save(conf_path)
+        super().__init__(crypto)
 

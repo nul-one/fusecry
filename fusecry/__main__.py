@@ -29,8 +29,8 @@ class FuseDaemon(Daemon):
         self.pidfile = pidfile
         self.root = root
         self.mountpoint = mountpoint
-        self.debug = debug
         self.fcio = fcio
+        self.debug = debug
 
     def run(self):
         FUSE(
@@ -70,13 +70,15 @@ def parse_args():
         "-k", "--key", action="store",
         help="Specify RSA key file instead of using password for encryption.")
     parser_mount.add_argument(
-        "-i", "--ignore-ic", action="store_true",
-        help="Don't fail on integrity check error.")
+        "-c", "--conf", type=str, action="store",
+        help="Specify or create FuseCry configuration file.")
     parser_mount.add_argument(
         "-d", "--debug", action="store_true",
         help="Enable debug mode with print output of each fs action.")
     parser_mount.set_defaults(
+        password = None,
         key=None,
+        conf = None,
         debug=False,
     )
 
@@ -99,15 +101,17 @@ def parse_args():
         "out_file", type=str, action="store",
         help="Encrypted file output.")
     parser_encrypt.add_argument(
+        "-p", "--password", action="store",
+        help="If not provided, will be asked for password in prompt.")
+    parser_encrypt.add_argument(
         "-k", "--key", type=str, action="store",
         help="Use RSA private key file instead of password.")
     parser_encrypt.add_argument(
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
-    parser_encrypt.add_argument(
-        "-p", "--password", action="store",
-        help="If not provided, will be asked for password in prompt.")
     parser_encrypt.set_defaults(
+        root = None,
+        password = None,
         key = None,
         conf = None,
     )
@@ -123,18 +127,17 @@ def parse_args():
         "out_file", type=str, action="store",
         help="Decrypted file output.")
     parser_decrypt.add_argument(
+        "-p", "--password", action="store",
+        help="If not provided, will be asked for password in prompt.")
+    parser_decrypt.add_argument(
         "-k", "--key", type=str, action="store",
         help="Use RSA private key file instead of password.")
     parser_decrypt.add_argument(
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
-    parser_decrypt.add_argument(
-        "-i", "--ignore-ic", action="store_true",
-        help="Don't fail on integrity check error.")
-    parser_decrypt.add_argument(
-        "-p", "--password", action="store",
-        help="If not provided, will be asked for password in prompt.")
     parser_decrypt.set_defaults(
+        root = None,
+        password = None,
         key = None,
         conf = None,
     )
@@ -147,15 +150,57 @@ def parse_args():
         "root", type=str, action="store",
         help="Root dir of fusecry fs that is not mounted.")
     parser_fsck.add_argument(
-        "-i", "--ignore-ic", action="store_true",
-        help="Don't fail on integrity check error.")
-    parser_fsck.add_argument(
         "-p", "--password", action="store",
         help="If not provided, will be asked for password in prompt.")
+    parser_fsck.add_argument(
+        "-k", "--key", type=str, action="store",
+        help="Use RSA private key file instead of password.")
+    parser_fsck.add_argument(
+        "-c", "--conf", type=str, action="store",
+        help="Specify FuseCry configuration file.")
+    parser_fsck.set_defaults(
+        password = None,
+        key = None,
+        conf = None,
+    )
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
 
+def get_io(args):
+    root = os.path.abspath(args.root) if args.root else None
+    conf_path = None
+    if args.conf:
+        conf_path = os.path.abspath(args.conf)
+    elif root:
+        conf_path = os.path.join(root, config.enc.conf)
+    elif os.path.isfile(os.path.abspath(args.in_file + config.enc.extension)):
+        conf_path = os.path.abspath(args.in_file + config.enc.extension)
+    else:
+        conf_path = os.path.abspath(args.out_file + config.enc.extension)
+    fcio = None
+    if args.key:
+        key_path = os.path.abspath(args.key)
+        try:
+            fcio = io.RSAFusecryIO(key_path, conf_path)
+        except io.IntegrityCheckException as e:
+            print("Bad key.")
+            sys.exit(1)
+        except io.BadConfException as e:
+            print(e)
+            sys.exit(1)
+    else:
+        password = get_secure_password_twice(args.password)
+        del args.password # don't keep it plaintext in memory
+        try:
+            fcio = io.PasswordFusecryIO(password, conf_path)
+        except io.IntegrityCheckException as e:
+            print("Bad key.")
+            sys.exit(1)
+        except io.BadConfException as e:
+            print(e)
+            sys.exit(1)
+    return fcio
 
 def get_secure_password(password=None):
     if not password:
@@ -177,19 +222,9 @@ def main():
     if args.cmd == 'mount':
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
-        conf_path = os.path.join(root, config.enc.conf)
-        fcio = None
-        if args.key:
-            key_path = os.path.abspath(args.key)
-            fcio = io.RSAFusecryIO(key_path, conf_path, args.ignore_ic)
-        else:
-            password = get_secure_password_twice(args.password)
-            del args.password # don't keep it plaintext in memory
-            fcio = io.PasswordFusecryIO(password, conf_path, args.ignore_ic)
-            print("-- mounting '{}' to '{}' with encryption{}".format(
-                root, mountpoint,
-                ' and file integrity check' if not args.ignore_ic else ''
-                ))
+        fcio = get_io(args)
+        print("-- mounting '{}' to '{}' with encryption".format(
+            root, mountpoint))
         if args.debug:
             FUSE(
                 Fusecry(
@@ -203,8 +238,9 @@ def main():
         else:
             pidfile = os.path.join(
                 os.path.dirname(mountpoint),
-                '.'+os.path.basename(os.path.abspath(mountpoint))+'.fcry.pid'
+                '.'+os.path.basename(mountpoint)+'.fcry.pid'
                 )
+            print(pidfile)
             fuse_daemon = FuseDaemon(
                 pidfile, root, mountpoint, fcio, args.debug)
             fuse_daemon.start()
@@ -214,54 +250,29 @@ def main():
             os.path.dirname(mountpoint),
             '.'+os.path.basename(mountpoint)+'.fcry.pid'
             )
-        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None, None)
+        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None)
         fuse_daemon.stop()
         print("-- '{}' has been unmounted".format(mountpoint))
     elif args.cmd == 'encrypt':
-        if args.key:
-            cry_rsa = None
-            with open(os.path.abspath(args.key), 'r') as f:
-                cry_rsa = cry.CryRSA(f.read())
-            single.rsa_encrypt(
-                cry_rsa,
-                args.in_file,
-                args.out_file,
-                info = True,
-                )
-        else:
-            password = get_secure_password_twice(args.password)
-            conf = os.path.abspath(args.conf) if args.conf else None
-            single.encrypt(
-                io.make_io(password, conf, False),
-                args.in_file,
-                args.out_file,
-                info = True,
-                )
+        fcio = get_io(args)
+        single.encrypt(
+            fcio,
+            args.in_file,
+            args.out_file,
+            info = True,
+            )
     elif args.cmd == 'decrypt':
-        if args.key:
-            cry_rsa = None
-            with open(os.path.abspath(args.key), 'r') as f:
-                cry_rsa = cry.CryRSA(f.read())
-            single.rsa_decrypt(
-                cry_rsa,
-                args.in_file,
-                args.out_file,
-                info = True,
-                )
-        else:
-            password = get_secure_password(args.password)
-            conf = os.path.abspath(args.conf) if args.conf else None
-            single.decrypt(
-                io.make_io(password, conf, args.ignore_ic),
-                args.in_file,
-                args.out_file,
-                info = True,
-                )
+        fcio = get_io(args)
+        single.decrypt(
+            fcio,
+            args.in_file,
+            args.out_file,
+            info = True,
+            )
     elif args.cmd == 'fsck':
-        password = get_secure_password(args.password)
         root = os.path.abspath(args.root)
-        conf = os.path.join(root, config.enc.conf)
-        io.make_io(password, conf, args.ignore_ic).fsck(root)
+        fcio = get_io(args)
+        fcio.fsck(root)
 
 if __name__ == '__main__':
     main()
