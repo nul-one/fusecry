@@ -27,30 +27,33 @@ class ConfData(object):
 
     def save(self, path=None):
         if path: self.path = path
-        print("Generating new conf: {}".format(self.path))
-        print("It's safe to be shared, but decryption won't work if lost.")
+        print("-- generating new conf: {}".format(self.path))
+        print("   chunk size: {}".format(self.chunk_size))
+        print("   It's safe to be shared. Decryption won't work if lost.")
         if self.type == 'password':
-            fmt = '< 8s {}s I {}s'.format(
+            fmt = '< 8s I {}s I {}s'.format(
                 config.enc.kdf_salt_size,
-                config.enc.chunk_size + meta_size,
+                self.chunk_size + meta_size,
                 )
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
                     self.type.encode(),
+                    self.chunk_size,
                     self.kdf_salt,
                     self.kdf_iters,
                     self.enc_chunk,
                     ))
         elif self.type == 'rsakey':
-            fmt = '< 8s I {}s {}s'.format(
+            fmt = '< 8s I I {}s {}s'.format(
                 self.rsa_key_size,
-                config.enc.chunk_size + meta_size,
+                self.chunk_size + meta_size,
                 )
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
                     self.type.encode(),
+                    self.chunk_size,
                     self.rsa_key_size,
                     self.enc_aes,
                     self.enc_chunk,
@@ -64,35 +67,38 @@ class ConfData(object):
         path_data = b''
         with open(self.path, 'rb') as f:
             path_data = f.read()
-        self.type = path_data[:struct.calcsize('<8s')].split(b'\0')[0].decode()
+        self.type, self.chunk_size = struct.unpack(
+            '< 8s I', path_data[:struct.calcsize('< 8s I')])
+        self.type = self.type.split(b'\0')[0].decode()
         if self.type == 'password':
-            # type, kdf_salt, kdf_iters, enc_chunk
-            fmt = '< 8s {}s I {}s'.format(
+            # type, chunk_size, kdf_salt, kdf_iters, enc_chunk
+            fmt = '< 8s I {}s I {}s'.format(
                 config.enc.kdf_salt_size,
-                config.enc.chunk_size + meta_size,
+                self.chunk_size + meta_size,
                 )
             s = struct.Struct(fmt)
-            _, self.kdf_salt, self.kdf_iters, self.enc_chunk=\
+            _, self.chunk_size, self.kdf_salt, self.kdf_iters, self.enc_chunk=\
                 s.unpack(path_data)
         elif self.type == 'rsakey':
-            _, self.rsa_key_size = struct.unpack(
-                '< 8s I', path_data[:struct.calcsize('< 8s I')])
-            # type, rsa_key_size, enc_aes, enc_chunk
-            fmt = '< 8s I {}s {}s'.format(
+            _, _, self.rsa_key_size = struct.unpack(
+                '< 8s I I', path_data[:struct.calcsize('< 8s I I')])
+            # type, chunk_size, rsa_key_size, enc_aes, enc_chunk
+            fmt = '< 8s I I {}s {}s'.format(
                 self.rsa_key_size,
-                config.enc.chunk_size + meta_size,
+                self.chunk_size + meta_size,
                 )
             s = struct.Struct(fmt)
-            _, _, self.enc_aes, self.enc_chunk = s.unpack(path_data)
+            _, self.chunk_size, _, self.enc_aes, self.enc_chunk =\
+                s.unpack(path_data)
         return self.type
 
 
 class FusecryIO(object):
-    def __init__(self, cry):
+    def __init__(self, cry, chunk_size):
         self.cry = cry
-        self.cs = config.enc.chunk_size
         self.ms = meta_size
         self.ss = struct.calcsize('<Q')
+        self.cs = chunk_size
 
     def check_ic_pass(self, path, check):
         if not check:
@@ -255,7 +261,7 @@ class FusecryIO(object):
 
 
 class PasswordFusecryIO(FusecryIO):
-    def __init__(self, password, conf_path=None):
+    def __init__(self, password, root, conf_path=None, chunk_size=None):
         conf_data = ConfData()
         crypto = None
         if conf_data.load(conf_path):
@@ -264,21 +270,24 @@ class PasswordFusecryIO(FusecryIO):
                     "Expected conf type: 'password', but found: '{}'".format(
                         conf_data.type))
             crypto, _, _, _ = cry.get_password_cry(
-                password, conf_data.kdf_salt, conf_data.kdf_iters)
-        else:
-            crypto, conf_data.kdf_salt, conf_data.kdf_iters, \
-                conf_data.enc_chunk = cry.get_password_cry(password)
-        if not conf_data.type:
-            conf_data.type = 'password'
-            conf_data.save(conf_path)
-        else:
+                password, conf_data.chunk_size, conf_data.kdf_salt,
+                conf_data.kdf_iters
+                )
             _, ic_pass = crypto.dec(conf_data.enc_chunk)
             self.check_ic_pass(conf_path, ic_pass)
-        super().__init__(crypto)
+        else:
+            conf_data.chunk_size = chunk_size if chunk_size \
+                else os.statvfs(root).f_bsize
+            crypto, conf_data.kdf_salt, conf_data.kdf_iters, \
+                conf_data.enc_chunk = cry.get_password_cry(
+                    password, conf_data.chunk_size)
+            conf_data.type = 'password'
+            conf_data.save(conf_path)
+        super().__init__(crypto, conf_data.chunk_size)
 
 
 class RSAFusecryIO(FusecryIO):
-    def __init__(self, key_path, conf_path=None):
+    def __init__(self, key_path, root, conf_path=None, chunk_size=None):
         conf_data = ConfData()
         rsa_key = None
         crypto = None
@@ -289,16 +298,20 @@ class RSAFusecryIO(FusecryIO):
                 raise BadConfException(
                     "Expected conf type: 'rsakey', but found: '{}'".format(
                         conf_data.type))
-            crypto, _, _, _ = cry.get_rsa_cry(rsa_key, conf_data.enc_aes)
             try:
-                _, ic_pass = crypto.dec(conf_data.enc_chunk)
+                crypto, _, _, _ = cry.get_rsa_cry(
+                    rsa_key, conf_data.chunk_size, conf_data.enc_aes)
             except ValueError:
                 raise BadConfException("RSA key did not match.")
+            _, ic_pass = crypto.dec(conf_data.enc_chunk)
             self.check_ic_pass(conf_path, ic_pass)
         else:
+            conf_data.chunk_size = chunk_size if chunk_size \
+                else os.statvfs(root).f_bsize
             crypto, conf_data.rsa_key_size, conf_data.enc_aes, \
-                conf_data.enc_chunk = cry.get_rsa_cry(rsa_key)
+                conf_data.enc_chunk = cry.get_rsa_cry(
+                    rsa_key, conf_data.chunk_size)
             conf_data.type = 'rsakey'
             conf_data.save(conf_path)
-        super().__init__(crypto)
+        super().__init__(crypto, conf_data.chunk_size)
 

@@ -6,21 +6,20 @@ from Crypto.Cipher import AES
 from Crypto.Hash import MD5 
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.PublicKey import RSA
-from fusecry.securedata import secure
 from random import randint
 import fusecry.config as config
 import os
 
 
-def get_password_cry(password, kdf_salt=None, kdf_iters=None):
+def get_password_cry(password, chunk_size, kdf_salt=None, kdf_iters=None):
     kdf_salt = kdf_salt or os.urandom(config.enc.kdf_salt_size)
     kdf_iters = kdf_iters or randint(*config.enc.kdf_iter_range)
     aes_key = PBKDF2(str(password), kdf_salt, config.enc.key_size, kdf_iters)
     crypto = Cry(aes_key)
-    enc_chunk = crypto.enc(os.urandom(config.enc.chunk_size))
+    enc_chunk = crypto.enc(os.urandom(chunk_size))
     return crypto, kdf_salt, kdf_iters, enc_chunk
 
-def get_rsa_cry(rsa_key, enc_aes=None):
+def get_rsa_cry(rsa_key, chunk_size, enc_aes=None):
     rsa = RSA.importKey(rsa_key)
     rsa_size = int((rsa.size()+1)/8)
     aes_key = None
@@ -32,7 +31,7 @@ def get_rsa_cry(rsa_key, enc_aes=None):
         enc_aes = rsa.encrypt(aes_key, 'K')[0]
         enc_aes = b'\x00' * (rsa_size - len(enc_aes)) + enc_aes
     crypto = Cry(aes_key)
-    enc_chunk = crypto.enc(os.urandom(config.enc.chunk_size))
+    enc_chunk = crypto.enc(os.urandom(chunk_size))
     return Cry(aes_key), rsa_size, enc_aes, enc_chunk
 
 

@@ -6,8 +6,7 @@ Main runnable.
 """
 
 from fuse import FUSE
-from fusecry import single, io, config, cry
-from fusecry.daemon import Daemon
+from fusecry import single, io, config
 from fusecry.filesystem import Fusecry
 from fusecry.securedata import secure
 from getpass import getpass
@@ -15,33 +14,12 @@ import argcomplete
 import argparse
 import os
 import signal
+import subprocess
 import sys
 
 def signal_handler(signal, frame):
     print("KeyboardInterrupt captured. Stopping Fusecry gracefully.")
     sys.exit(0)
-
-class FuseDaemon(Daemon):
-    """
-    Daemonize fuse process.
-    """
-    def __init__(self, pidfile, root, mountpoint, fcio, debug):
-        self.pidfile = pidfile
-        self.root = root
-        self.mountpoint = mountpoint
-        self.fcio = fcio
-        self.debug = debug
-
-    def run(self):
-        FUSE(
-            Fusecry(
-                self.root,
-                self.fcio,
-                self.debug
-                ),
-            self.mountpoint,
-            foreground=True
-            )
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -73,8 +51,8 @@ def parse_args():
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
     parser_mount.add_argument(
-        "-n", "--no-pid", action="store_true",
-        help="Without local pidfile (have to use 'fusermount' to unmount).")
+        "--chunk-size", type=int, action="store",
+        help="Set chunk size. Has to be multiple of 4096.")
     parser_mount.add_argument(
         "-d", "--debug", action="store_true",
         help="Enable debug mode with print output of each fs action.")
@@ -82,7 +60,7 @@ def parse_args():
         password = None,
         key=None,
         conf = None,
-        no_pid = False,
+        chunk_size = config.enc.default_chunk_size,
         debug=False,
     )
 
@@ -118,6 +96,7 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
+        chunk_size = config.enc.default_chunk_size,
     )
 
     parser_decrypt = subparsers.add_parser(
@@ -144,6 +123,7 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
+        chunk_size = config.enc.default_chunk_size,
     )
 
     parser_fsck = subparsers.add_parser(
@@ -174,6 +154,7 @@ def parse_args():
 def get_io(args):
     root = os.path.abspath(args.root) if args.root else None
     conf_path = None
+    chunk_size = args.chunk_size
     if args.conf:
         conf_path = os.path.abspath(args.conf)
     elif root:
@@ -186,7 +167,7 @@ def get_io(args):
     if args.key:
         key_path = os.path.abspath(args.key)
         try:
-            fcio = io.RSAFusecryIO(key_path, conf_path)
+            fcio = io.RSAFusecryIO(key_path, root, conf_path, chunk_size)
         except io.IntegrityCheckException as e:
             print("Bad key.")
             sys.exit(1)
@@ -197,7 +178,7 @@ def get_io(args):
         password = get_secure_password_twice(args.password)
         del args.password # don't keep it plaintext in memory
         try:
-            fcio = io.PasswordFusecryIO(password, conf_path)
+            fcio = io.PasswordFusecryIO(password, root, conf_path, chunk_size)
         except io.IntegrityCheckException as e:
             print("Bad key.")
             sys.exit(1)
@@ -227,49 +208,18 @@ def main():
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
         fcio = get_io(args)
-        print("-- mounting '{}' to '{}' with encryption".format(
-            root, mountpoint))
-        if args.debug:
-            FUSE(
-                Fusecry(
-                    root,
-                    fcio,
-                    args.debug
-                    ),
-                mountpoint,
-                foreground=True
-                )
-        else:
-            if args.no_pid:
-                print("To unmount: 'fusermount -u {}'".format(mountpoint))
-                FUSE(
-                    Fusecry(
-                        root,
-                        fcio,
-                        args.debug
-                        ),
-                    mountpoint,
-                    foreground=False
-                    )
-            else:
-                pidfile = os.path.join(
-                    os.path.dirname(mountpoint),
-                    '.'+os.path.basename(mountpoint)+'.fcry.pid'
-                    )
-                print("pidfile: '{}'".format(pidfile))
-                print("To unmount: 'fusercry umount {}'".format(mountpoint))
-                fuse_daemon = FuseDaemon(
-                    pidfile, root, mountpoint, fcio, args.debug)
-                fuse_daemon.start()
-    elif args.cmd == 'umount':
-        mountpoint = os.path.abspath(args.mountpoint)
-        pidfile = os.path.join(
-            os.path.dirname(mountpoint),
-            '.'+os.path.basename(mountpoint)+'.fcry.pid'
+        print("-- FuseCry mounting '{}' to '{}'".format(root, mountpoint))
+        FUSE(
+            Fusecry(
+                root,
+                fcio,
+                args.debug,
+                ),
+            mountpoint,
+            foreground=args.debug
             )
-        fuse_daemon = FuseDaemon(pidfile, None, mountpoint, None, None)
-        fuse_daemon.stop()
-        print("-- '{}' has been unmounted".format(mountpoint))
+    elif args.cmd == 'umount':
+        subprocess.call(('fusermount','-u', args.mountpoint))
     elif args.cmd == 'encrypt':
         fcio = get_io(args)
         single.encrypt(

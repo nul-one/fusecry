@@ -4,8 +4,6 @@ FuseCry config.
 
 from Crypto.Cipher import AES
 from Crypto.Hash import MD5
-import os
-import struct
 
 class Objectview(object):
     def __init__(self, d):
@@ -19,9 +17,9 @@ enc = Objectview(
         "kdf_iter_range": (60000,80000),
         "kdf_salt_size": 32,
         "aes_block": AES.block_size,
-        "chunk_size": 256 * AES.block_size, # 256*16 = 4096 FS_B
         "extension": '.fcry',
         "conf": '.fusecry',
+        "default_chunk_size": 4096,
     }
 )
 
