@@ -29,41 +29,54 @@ features
 -------------------------
 
 - mount
+- encrypt with password or RSA key
 - encrypt/decrypt single files
 - real time integrity check
 - filesystem check
+- check if password/RSA key is valid before mounting
+- detect local FS block size for best performance
+- option to choose chunk size to optimize for READ or WRITE
+- encrypted files keep same file names and directory structure (good for backup
+solutions like DropBox where you have option to roll-back previous versions of
+individual files)
+
+backwards compatibility
+-------------------------
+
+Versions 0.4.0 and above are not backwards compatible with previous versions.
 
 usage
 -------------------------
 
 ### mount/umount
 
-`fusecry mount SOURCE_DIR MOUNT_POINT`  
-`fusecry umount MOUNT_POINT`  
+`fusecry mount SOURCE_DIR MOUNT_POINT [--key RSA_KEY_PATH]`
+`fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`
 Data copied to mount point will remain encrypted in source directory.  
 
 ### single file encryption
 
-`fusecry encrypt INPUT_FILE OUTPUT_FILE -c FUSECRY_MOUNT_SETTINGS`  
-`fusecry decrypt INPUT_FILE OUTPUT_FILE -c FUSECRY_MOUNT_SETTINGS`  
-FUSECRY\_MOUNT\_SETTINGS is stored in ROOT directory. If you call the command
-without existing settings file, it will be created.
+`fusecry encrypt INPUT_FILE OUTPUT_FILE [-c FCRY_CONF_FILE] [--key PUB_OR_PVT_RSA_KEY_PATH]`  
+`fusecry decrypt INPUT_FILE OUTPUT_FILE [-c FCRY_CONF_FILE] [--key PVT_RSA_KEY_PATH]`  
+`FCRY_CONF_FILE` is stored in ROOT directory of existing FuseCry filesystem.  
+If you call the command without existing settings file, it will be created in
+case of encryption or default will be used `INPUT_FILE.fcry` in case of
+decryption.
 
 ### fsck
 
-`fusecry fsck ROOT`
+`fusecry fsck ROOT [--key RSA_KEY_PATH]`
 ROOT is the source dir that is to be mounted. Make sure it is not mounted
-during fsck or you might get false-positive error detection.
+during fsck or you might get false-positive errors detected.
 
 known deficiencies and limitations
 -------------------------
 
 - file names are not being encrypted by design
-- block size is fixed to 4096
+- chunk size has to be a multiple of 4096
 
 future plans and missing features (in no particular order)
 -------------------------
 
-- choice and detection of block sizes
 - password change (bulk re-encryption)
 
