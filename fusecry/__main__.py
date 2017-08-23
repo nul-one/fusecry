@@ -175,7 +175,9 @@ def get_io(args):
             print(e)
             sys.exit(1)
     else:
-        password = get_secure_password_twice(args.password)
+        password = get_secure_password(args.password) \
+            if os.path.isfile(conf_path) \
+            else get_secure_password_twice(args.password)
         del args.password # don't keep it plaintext in memory
         try:
             fcio = io.PasswordFusecryIO(password, root, conf_path, chunk_size)

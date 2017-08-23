@@ -111,13 +111,13 @@ class Fusecry(Operations):
         stat = dict((key, getattr(stv, key)) for key in (
             'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
             'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'))
-        chunk_size = io.cs
-        block_ratio = chunk_size / stat['f_bsize']
+        chunk_size = self.io.cs
+        block_ratio = self.io.cs / (self.io.cs + self.io.ms)
         stat['f_bsize']     = chunk_size 
         stat['f_frsize']    = chunk_size
-        stat['f_blocks']    = int(stat['f_blocks'] / block_ratio)
-        stat['f_bfree']     = int(stat['f_bfree'] / block_ratio)
-        stat['f_bavail']    = int(stat['f_bavail'] / block_ratio)
+        stat['f_blocks']    = int(stat['f_blocks'] * block_ratio)
+        stat['f_bfree']     = int(stat['f_bfree'] * block_ratio)
+        stat['f_bavail']    = int(stat['f_bavail'] * block_ratio)
         return stat
     
     @debug_log
