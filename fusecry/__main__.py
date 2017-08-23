@@ -155,6 +155,11 @@ def get_io(args):
     root = os.path.abspath(args.root) if args.root else None
     conf_path = None
     chunk_size = args.chunk_size
+    if chunk_size < config.enc.default_chunk_size or \
+            chunk_size % config.enc.default_chunk_size:
+        print("Chunk size must be multiple of {}.".format(
+            config.enc.default_chunk_size))
+        sys.exit(1)
     if args.conf:
         conf_path = os.path.abspath(args.conf)
     elif root:

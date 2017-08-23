@@ -278,6 +278,10 @@ class PasswordFuseCryIO(FuseCryIO):
         else:
             conf_data.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
+            if conf_data.chunk_size % config.enc.default_chunk_size:
+                raise BadConfException(
+                    "Chunk size must be multiple of {}, but got {}.".format(
+                        config.enc.default_chunk_size, conf_data.chunk_size))
             crypto, conf_data.kdf_salt, conf_data.kdf_iters, \
                 conf_data.enc_chunk = cry.get_password_cry(
                     password, conf_data.chunk_size)
@@ -308,6 +312,10 @@ class RSAFuseCryIO(FuseCryIO):
         else:
             conf_data.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
+            if conf_data.chunk_size % config.enc.default_chunk_size:
+                raise BadConfException(
+                    "Chunk size must be multiple of {}, but got {}.".format(
+                        config.enc.default_chunk_size, conf_data.chunk_size))
             crypto, conf_data.rsa_key_size, conf_data.enc_aes, \
                 conf_data.enc_chunk = cry.get_rsa_cry(
                     rsa_key, conf_data.chunk_size)
