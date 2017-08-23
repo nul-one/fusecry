@@ -1,5 +1,5 @@
 """
-Fusecry IO functions.
+FuseCry IO functions.
 """
 
 from fusecry import config, cry
@@ -7,16 +7,16 @@ import os
 import struct
 
 
-class FusecryException(Exception):
+class FuseCryException(Exception):
     pass
 
-class IntegrityCheckException(FusecryException):
+class IntegrityCheckException(FuseCryException):
     pass
 
-class FileSizeException(FusecryException):
+class FileSizeException(FuseCryException):
     pass
 
-class BadConfException(FusecryException):
+class BadConfException(FuseCryException):
     pass
 
 meta_size = ( config.enc.key_size
@@ -93,7 +93,7 @@ class ConfData(object):
         return self.type
 
 
-class FusecryIO(object):
+class FuseCryIO(object):
     def __init__(self, cry, chunk_size):
         self.cry = cry
         self.ms = meta_size
@@ -240,7 +240,7 @@ class FusecryIO(object):
         for r,d,f in os.walk(path):
             for file_name in f:
                 files_checked += 1
-                print("Fusecry FSCK: checking {}/{} files. {}".format(
+                print("FuseCry FSCK: checking {}/{} files. {}".format(
                     files_checked,
                     total_files,
                     ( "Errors so far: " + str(len(errors))
@@ -260,7 +260,7 @@ class FusecryIO(object):
         return bool(len(errors))
 
 
-class PasswordFusecryIO(FusecryIO):
+class PasswordFuseCryIO(FuseCryIO):
     def __init__(self, password, root, conf_path=None, chunk_size=None):
         conf_data = ConfData()
         crypto = None
@@ -286,7 +286,7 @@ class PasswordFusecryIO(FusecryIO):
         super().__init__(crypto, conf_data.chunk_size)
 
 
-class RSAFusecryIO(FusecryIO):
+class RSAFuseCryIO(FuseCryIO):
     def __init__(self, key_path, root, conf_path=None, chunk_size=None):
         conf_data = ConfData()
         rsa_key = None

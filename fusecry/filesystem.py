@@ -1,5 +1,5 @@
 """
-Fusecry FUSE operations.
+FuseCry FUSE operations.
 """
 
 from datetime import datetime
@@ -22,7 +22,7 @@ def debug_log(func):
         return func(*args, **kwargs)
     return function_wrapper
 
-class Fusecry(Operations):
+class FuseCry(Operations):
     def __init__(self, root, io, debug=False):
         self.root = root
         self.debug = debug

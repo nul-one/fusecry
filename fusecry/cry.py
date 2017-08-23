@@ -1,5 +1,5 @@
 """
-Fusecry encryption functions.
+FuseCry encryption functions.
 """
 
 from Crypto.Cipher import AES 

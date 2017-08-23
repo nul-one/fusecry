@@ -7,7 +7,7 @@ Main runnable.
 
 from fuse import FUSE
 from fusecry import single, io, config
-from fusecry.filesystem import Fusecry
+from fusecry.filesystem import FuseCry
 from fusecry.securedata import secure
 from getpass import getpass
 import argcomplete
@@ -18,7 +18,7 @@ import subprocess
 import sys
 
 def signal_handler(signal, frame):
-    print("KeyboardInterrupt captured. Stopping Fusecry gracefully.")
+    print("KeyboardInterrupt captured. Stopping FuseCry gracefully.")
     sys.exit(0)
 
 def parse_args():
@@ -167,7 +167,7 @@ def get_io(args):
     if args.key:
         key_path = os.path.abspath(args.key)
         try:
-            fcio = io.RSAFusecryIO(key_path, root, conf_path, chunk_size)
+            fcio = io.RSAFuseCryIO(key_path, root, conf_path, chunk_size)
         except io.IntegrityCheckException as e:
             print("Bad key.")
             sys.exit(1)
@@ -180,7 +180,7 @@ def get_io(args):
             else get_secure_password_twice(args.password)
         del args.password # don't keep it plaintext in memory
         try:
-            fcio = io.PasswordFusecryIO(password, root, conf_path, chunk_size)
+            fcio = io.PasswordFuseCryIO(password, root, conf_path, chunk_size)
         except io.IntegrityCheckException as e:
             print("Bad key.")
             sys.exit(1)
@@ -215,7 +215,7 @@ def main():
         fcio = get_io(args)
         print("-- FuseCry mounting '{}' to '{}'".format(root, mountpoint))
         FUSE(
-            Fusecry(
+            FuseCry(
                 root,
                 fcio,
                 args.debug,
