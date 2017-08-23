@@ -205,6 +205,9 @@ def main():
     args = parse_args()
     signal.signal(signal.SIGINT, signal_handler)
     if args.cmd == 'mount':
+        if args.chunk_size % config.enc.default_chunk_size:
+            print("Chunk size has to be a multiple of 4096.")
+            sys.exit(1)
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
         fcio = get_io(args)
