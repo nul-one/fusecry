@@ -28,9 +28,10 @@ In addition, add the following to your `.bashrc` to enable autocompletion:
 features
 -------------------------
 
-- mount
+- mount any subdirectory of encrypted structure
 - encrypt with password or RSA key
 - encrypt/decrypt single files
+- encrypt/decrypt streams
 - real time integrity check
 - filesystem check
 - check if password/RSA key is valid before mounting
@@ -40,7 +41,7 @@ features
 solutions like DropBox where you have option to roll-back previous versions of
 individual files)
 
-backwards compatibility
+compatibility
 -------------------------
 
 Versions 0.4.0 and above are not backwards compatible with previous versions.
@@ -54,6 +55,10 @@ usage
 `fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`
 Data copied to mount point will remain encrypted in source directory.  
 
+### mount subdirectory
+
+`fusecry mount SOURCE_DIR/subdir MOUNT_POINT --conf SOURCE_DIR/.fusecry [--key RSA_KEY_PATH]`
+
 ### single file encryption
 
 `fusecry encrypt INPUT_FILE OUTPUT_FILE [-c FCRY_CONF_FILE] [--key PUB_OR_PVT_RSA_KEY_PATH]`  
@@ -62,6 +67,11 @@ Data copied to mount point will remain encrypted in source directory.
 If you call the command without existing settings file, it will be created in
 case of encryption or default will be used `INPUT_FILE.fcry` in case of
 decryption.
+
+### stream encryption
+
+`<DATA fusecry stream encrypt -c FCRY_CONF_FILE [--key PUB_OR_PVT_RSA_KEY_PATH]`  
+`<DATA fusecry stream decrypt -c FCRY_CONF_FILE [--key PVT_RSA_KEY_PATH]`  
 
 ### fsck
 
@@ -78,5 +88,6 @@ known deficiencies and limitations
 future plans and missing features (in no particular order)
 -------------------------
 
+- RAM file system (for fast file access)
 - password change (bulk re-encryption)
 
