@@ -6,7 +6,7 @@ Main runnable.
 """
 
 from fuse import FUSE
-from fusecry import single, io, config
+from fusecry import single, io, config, stream
 from fusecry.filesystem import FuseCry
 from fusecry.securedata import secure
 from getpass import getpass
@@ -123,6 +123,30 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
+        chunk_size = config.enc.default_chunk_size,
+    )
+
+    parser_stream = subparsers.add_parser(
+        "stream",
+        description="Encrypt or decrypt pipe data."
+        )
+    parser_stream.add_argument(
+        "action", type=str, action="store", choices=('encrypt','decrypt'),
+        help="Choose encrypt or decrypt.")
+    parser_stream.add_argument(
+        "-c", "--conf", type=str, action="store", required=True,
+        help="Specify or create FuseCry configuration file.")
+    parser_stream.add_argument(
+        "-p", "--password", action="store",
+        help="If not provided, will be asked for password in prompt.")
+    parser_stream.add_argument(
+        "-k", "--key", type=str, action="store",
+        help="Use RSA private key file instead of password.")
+    parser_stream.add_argument(
+        "--chunk-size", type=int, action="store",
+        help="Set chunk size. Has to be multiple of 4096.")
+    parser_stream.set_defaults(
+        root = os.path.abspath(os.path.curdir),
         chunk_size = config.enc.default_chunk_size,
     )
 
@@ -246,6 +270,12 @@ def main():
             args.out_file,
             info = True,
             )
+    elif args.cmd == 'stream':
+        fcio = get_io(args)
+        if args.action == 'encrypt':
+            stream.encrypt(fcio, sys.stdin, sys.stdout)
+        elif args.action == 'decrypt':
+            stream.decrypt(fcio, sys.stdin, sys.stdout)
     elif args.cmd == 'fsck':
         root = os.path.abspath(args.root)
         fcio = get_io(args)
