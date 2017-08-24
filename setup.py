@@ -6,8 +6,8 @@ import fusecry
 setup(
     name = 'fusecry',
     description = fusecry.__doc__.strip(),
-    url = 'https://github.com/phlogisto/fusecry',
-    download_url = 'https://github.com/phlogisto/fusecry/archive/'+fusecry.__version__+'.tar.gz',
+    url = 'https://github.com/nul-one/fusecry',
+    download_url = 'https://github.com/nul-one/fusecry/archive/'+fusecry.__version__+'.tar.gz',
     version = fusecry.__version__,
     author = fusecry.__author__,
     author_email = fusecry.__author_email__,

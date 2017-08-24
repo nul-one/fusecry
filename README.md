@@ -1,7 +1,7 @@
 
 fusecry 
 ==================================================
-[![Build Status](https://travis-ci.org/phlogisto/fusecry.png)](https://travis-ci.org/phlogisto/fusecry)
+[![Build Status](https://travis-ci.org/nul-one/fusecry.png)](https://travis-ci.org/nul-one/fusecry)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fusecry/Lobby)
 
 FUSE based encrypted (AES.MODE\_CBC) filesystem and encryption tool
@@ -19,7 +19,7 @@ install
 `pip3 install fusecry`  
 
 ### install from github
-`pip3 install -U git+https://github.com/phlogisto/fusecry.git`  
+`pip3 install -U git+https://github.com/nul-one/fusecry.git`  
 
 ### autocompletion
 In addition, add the following to your `.bashrc` to enable autocompletion:  
