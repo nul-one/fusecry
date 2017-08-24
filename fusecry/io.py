@@ -19,9 +19,7 @@ class FileSizeException(FuseCryException):
 class BadConfException(FuseCryException):
     pass
 
-meta_size = ( config.enc.key_size
-            + 2 * config.enc.iv_size
-            + config.enc.hash_size )
+meta_size = config.enc.iv_size + config.enc.hash_size
 
 class ConfData(object):
 

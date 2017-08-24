@@ -40,6 +40,7 @@ class Cry(object):
         self.ks = config.enc.key_size
         self.vs = config.enc.iv_size
         self.aes_key = aes_key
+        self.aes = AES.new(aes_key, AES.MODE_CBC, os.urandom(self.vs))
 
     def enc(self, chunk):
         checksum = MD5.new()
@@ -49,32 +50,22 @@ class Cry(object):
             chunk += bytes(AES.block_size - len(chunk) % AES.block_size)
         checksum.update(chunk)
         chunk = checksum.digest() + chunk
-        random_key = os.urandom(self.ks)
-        random_iv = os.urandom(self.vs)
-        random_encryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
         secret_iv = os.urandom(self.vs)
-        secret_key = self.aes_key
-        secret_encryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
-        encrypted_random_key = secret_encryptor.encrypt(random_key)
-        encrypted_random_iv = secret_encryptor.encrypt(random_iv)
-        return secret_iv \
-            + encrypted_random_key \
-            + encrypted_random_iv \
-            + random_encryptor.encrypt(chunk)
+        #secret_key = self.aes_key
+        #secret_encryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
+        self.aes.__init__(self.aes_key, AES.MODE_CBC, secret_iv)
+        #return secret_iv + secret_encryptor.encrypt(chunk)
+        return secret_iv + self.aes.encrypt(chunk)
 
     def dec(self, enc_chunk):
-        poz = 0
         if not enc_chunk:
             return b'', False
-        secret_iv = enc_chunk[poz:poz+self.vs]; poz+=self.vs
-        encrypted_random_key = enc_chunk[poz:poz+self.ks]; poz+=self.ks
-        encrypted_random_iv = enc_chunk[poz:poz+self.vs]; poz+=self.vs
-        secret_key = self.aes_key
-        secret_decryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
-        random_key = secret_decryptor.decrypt(encrypted_random_key)
-        random_iv = secret_decryptor.decrypt(encrypted_random_iv)
-        random_decryptor = AES.new(random_key, AES.MODE_CBC, random_iv)
-        chunk = random_decryptor.decrypt(enc_chunk[poz:])
+        secret_iv = enc_chunk[:self.vs]
+        #secret_key = self.aes_key
+        #secret_decryptor = AES.new(secret_key, AES.MODE_CBC, secret_iv)
+        self.aes.__init__(self.aes_key, AES.MODE_CBC, secret_iv)
+        #chunk = secret_decryptor.decrypt(enc_chunk[self.vs:])
+        chunk = self.aes.decrypt(enc_chunk[self.vs:])
         checksum = MD5.new()
         checksum.update(chunk[MD5.digest_size:])
         old_checksum = chunk[:MD5.digest_size]
