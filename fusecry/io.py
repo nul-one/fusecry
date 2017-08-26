@@ -19,7 +19,6 @@ class FileSizeException(FuseCryException):
 class BadConfException(FuseCryException):
     pass
 
-meta_size = config.enc.iv_size + config.enc.hash_size
 
 class ConfData(object):
 
@@ -29,10 +28,7 @@ class ConfData(object):
         print("   chunk size: {}".format(self.chunk_size))
         print("   It's safe to be shared. Decryption won't work if lost.")
         if self.type == 'password':
-            fmt = '< 8s I {}s I {}s'.format(
-                config.enc.kdf_salt_size,
-                self.chunk_size + meta_size,
-                )
+            fmt = '< 8s I {}s I 1024s'.format(config.kdf_salt_size)
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
@@ -40,13 +36,10 @@ class ConfData(object):
                     self.chunk_size,
                     self.kdf_salt,
                     self.kdf_iters,
-                    self.enc_chunk,
+                    self.sample,
                     ))
         elif self.type == 'rsakey':
-            fmt = '< 8s I I {}s {}s'.format(
-                self.rsa_key_size,
-                self.chunk_size + meta_size,
-                )
+            fmt = '< 8s I I {}s 1024s'.format(self.rsa_key_size)
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
@@ -54,7 +47,7 @@ class ConfData(object):
                     self.chunk_size,
                     self.rsa_key_size,
                     self.enc_aes,
-                    self.enc_chunk,
+                    self.sample,
                     ))
 
     def load(self, path=None):
@@ -69,24 +62,18 @@ class ConfData(object):
             '< 8s I', path_data[:struct.calcsize('< 8s I')])
         self.type = self.type.split(b'\0')[0].decode()
         if self.type == 'password':
-            # type, chunk_size, kdf_salt, kdf_iters, enc_chunk
-            fmt = '< 8s I {}s I {}s'.format(
-                config.enc.kdf_salt_size,
-                self.chunk_size + meta_size,
-                )
+            # type, chunk_size, kdf_salt, kdf_iters, sample
+            fmt = '< 8s I {}s I 1024s'.format(config.kdf_salt_size)
             s = struct.Struct(fmt)
-            _, self.chunk_size, self.kdf_salt, self.kdf_iters, self.enc_chunk=\
+            _, self.chunk_size, self.kdf_salt, self.kdf_iters, self.sample=\
                 s.unpack(path_data)
         elif self.type == 'rsakey':
             _, _, self.rsa_key_size = struct.unpack(
                 '< 8s I I', path_data[:struct.calcsize('< 8s I I')])
-            # type, chunk_size, rsa_key_size, enc_aes, enc_chunk
-            fmt = '< 8s I I {}s {}s'.format(
-                self.rsa_key_size,
-                self.chunk_size + meta_size,
-                )
+            # type, chunk_size, rsa_key_size, enc_aes, sample
+            fmt = '< 8s I I {}s 1024s'.format(self.rsa_key_size)
             s = struct.Struct(fmt)
-            _, self.chunk_size, _, self.enc_aes, self.enc_chunk =\
+            _, self.chunk_size, _, self.enc_aes, self.sample=\
                 s.unpack(path_data)
         return self.type
 
@@ -94,7 +81,7 @@ class ConfData(object):
 class FuseCryIO(object):
     def __init__(self, cry, chunk_size):
         self.cry = cry
-        self.ms = meta_size
+        self.ms = self.cry.ms
         self.ss = struct.calcsize('<Q')
         self.cs = chunk_size
 
@@ -115,9 +102,8 @@ class FuseCryIO(object):
             f.seek(ncc*(self.ms+self.cs))
             while len(buf) < (sb+rlen) and f.tell() < st_size - self.ss:
                 cdata = f.read(self.ms+self.cs)
-                cdata_len = len(cdata)-self.ms
-                if cdata_len % config.enc.aes_block:
-                    cdata = cdata[:-(cdata_len % config.enc.aes_block)]
+                if len(cdata) % self.cry.vs:
+                    cdata = cdata[:-(len(cdata) % self.cry.vs)]
                 dec, ic_pass = self.cry.dec(cdata)
                 self.check_ic_pass(path, ic_pass)
                 buf += dec
@@ -140,7 +126,7 @@ class FuseCryIO(object):
             f.seek(s)
             done_length = 0
             while done_length < len(xbuf):
-                chunk = xbuf[done_length:self.cs]
+                chunk = xbuf[done_length:done_length+self.cs]
                 done_length += len(chunk)
                 if not len(chunk):
                     break
@@ -177,7 +163,7 @@ class FuseCryIO(object):
                     path, size, st_size))
         st_size = os.stat(path).st_size
         max_size = calc_max_size(st_size)
-        min_size = max_size - config.enc.aes_block + 1
+        min_size = max_size - self.cry.vs + 1
         exception = None
         with open(path, 'rb') as f:
             file_end = f.seek(0,os.SEEK_END)
@@ -245,8 +231,8 @@ class FuseCryIO(object):
                         if len(errors) else "No errors so far." ),
                     ))
                 if os.path.join(r,file_name) !=\
-                        os.path.join(path,config.enc.conf):
-                    error = self.fsck_file(os.path.join(r,file_name))
+                        os.path.join(path, config.conf):
+                    error = self.fsck_file(os.path.join(r, file_name))
                     if error:
                         errors.append(error)
         if len(errors):
@@ -271,17 +257,13 @@ class PasswordFuseCryIO(FuseCryIO):
                 password, conf_data.chunk_size, conf_data.kdf_salt,
                 conf_data.kdf_iters
                 )
-            _, ic_pass = crypto.dec(conf_data.enc_chunk)
+            _, ic_pass = crypto.dec(conf_data.sample)
             self.check_ic_pass(conf_path, ic_pass)
         else:
             conf_data.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
-            if conf_data.chunk_size % config.enc.default_chunk_size:
-                raise BadConfException(
-                    "Chunk size must be multiple of {}, but got {}.".format(
-                        config.enc.default_chunk_size, conf_data.chunk_size))
             crypto, conf_data.kdf_salt, conf_data.kdf_iters, \
-                conf_data.enc_chunk = cry.get_password_cry(
+                conf_data.sample = cry.get_password_cry(
                     password, conf_data.chunk_size)
             conf_data.type = 'password'
             conf_data.save(conf_path)
@@ -305,17 +287,13 @@ class RSAFuseCryIO(FuseCryIO):
                     rsa_key, conf_data.chunk_size, conf_data.enc_aes)
             except ValueError:
                 raise BadConfException("RSA key did not match.")
-            _, ic_pass = crypto.dec(conf_data.enc_chunk)
+            _, ic_pass = crypto.dec(conf_data.sample)
             self.check_ic_pass(conf_path, ic_pass)
         else:
             conf_data.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
-            if conf_data.chunk_size % config.enc.default_chunk_size:
-                raise BadConfException(
-                    "Chunk size must be multiple of {}, but got {}.".format(
-                        config.enc.default_chunk_size, conf_data.chunk_size))
             crypto, conf_data.rsa_key_size, conf_data.enc_aes, \
-                conf_data.enc_chunk = cry.get_rsa_cry(
+                conf_data.sample = cry.get_rsa_cry(
                     rsa_key, conf_data.chunk_size)
             conf_data.type = 'rsakey'
             conf_data.save(conf_path)

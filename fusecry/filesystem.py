@@ -26,7 +26,7 @@ class FuseCry(Operations):
     def __init__(self, root, io, debug=False):
         self.root = root
         self.debug = debug
-        self.conf = os.path.join(self.root, config.enc.conf)
+        self.conf = os.path.join(self.root, config.conf)
         self.io = io
 
     def __real_path(self, path):
@@ -69,8 +69,8 @@ class FuseCry(Operations):
         if os.path.isdir(real_path):
             dirents.extend(os.listdir(real_path))
             if os.path.abspath(real_path) == os.path.abspath(self.root):
-                if config.enc.conf in dirents:
-                    dirents.remove(config.enc.conf)
+                if config.conf in dirents:
+                    dirents.remove(config.conf)
         for r in dirents:
             yield r
     
@@ -111,13 +111,13 @@ class FuseCry(Operations):
         stat = dict((key, getattr(stv, key)) for key in (
             'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
             'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'))
-        chunk_size = self.io.cs
-        block_ratio = self.io.cs / (self.io.cs + self.io.ms)
-        stat['f_bsize']     = chunk_size 
-        stat['f_frsize']    = chunk_size
-        stat['f_blocks']    = int(stat['f_blocks'] * block_ratio)
-        stat['f_bfree']     = int(stat['f_bfree'] * block_ratio)
-        stat['f_bavail']    = int(stat['f_bavail'] * block_ratio)
+        size_ratio = self.io.cs / (self.io.cs + self.io.ms)
+        block_ratio = stat['f_bsize'] / self.io.cs
+        stat['f_bsize']     = self.io.cs
+        stat['f_frsize']    = self.io.cs
+        stat['f_blocks']    = int(stat['f_blocks'] * size_ratio * block_ratio)
+        stat['f_bfree']     = int(stat['f_bfree'] * size_ratio * block_ratio)
+        stat['f_bavail']    = int(stat['f_bavail'] * size_ratio * block_ratio)
         return stat
     
     @debug_log

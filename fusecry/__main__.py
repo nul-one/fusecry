@@ -21,11 +21,23 @@ def signal_handler(signal, frame):
     print("KeyboardInterrupt captured. Stopping FuseCry gracefully.")
     sys.exit(0)
 
+def check_chunk_size(chunk_size):
+    from Crypto.Cipher.AES import block_size
+    chunk_size = int(chunk_size)
+    if chunk_size % block_size:
+        raise ValueError(
+            "Chunk size should be multiple of {}.".format(block_size))
+    return chunk_size
+
 def parse_args():
+    from Crypto.Cipher.AES import block_size
     parser = argparse.ArgumentParser(
         prog = "fuse",
         description="Encrypted filesystem based on FUSE."
         )
+    parser.add_argument(
+        "-d", "--debug", action="store_true",
+        help="Enable debug mode with print output of each fs action.")
     subparsers = parser.add_subparsers(
         description="(use each command with -h for more help)",
         dest="cmd",
@@ -33,7 +45,7 @@ def parse_args():
 
     parser_mount = subparsers.add_parser(
         "mount",
-        description="Mount source dir to local directory."
+        description="Mount source dir to local mountpoint."
         )
     parser_mount.add_argument(
         "root", type=str, action="store",
@@ -51,17 +63,13 @@ def parse_args():
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
     parser_mount.add_argument(
-        "--chunk-size", type=int, action="store",
-        help="Set chunk size. Has to be multiple of 4096.")
-    parser_mount.add_argument(
-        "-d", "--debug", action="store_true",
-        help="Enable debug mode with print output of each fs action.")
+        "--chunk-size", type=check_chunk_size, action="store",
+        help="Set chunk size. Has to be multiple of {}.".format(block_size))
     parser_mount.set_defaults(
         password = None,
         key=None,
         conf = None,
-        chunk_size = config.enc.default_chunk_size,
-        debug=False,
+        chunk_size = config.default_chunk_size,
     )
 
     parser_umount = subparsers.add_parser(
@@ -96,7 +104,7 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
-        chunk_size = config.enc.default_chunk_size,
+        chunk_size = config.default_chunk_size,
     )
 
     parser_decrypt = subparsers.add_parser(
@@ -123,7 +131,7 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
-        chunk_size = config.enc.default_chunk_size,
+        chunk_size = config.default_chunk_size,
     )
 
     parser_stream = subparsers.add_parser(
@@ -143,11 +151,11 @@ def parse_args():
         "-k", "--key", type=str, action="store",
         help="Use RSA private key file instead of password.")
     parser_stream.add_argument(
-        "--chunk-size", type=int, action="store",
-        help="Set chunk size. Has to be multiple of 4096.")
+        "--chunk-size", type=check_chunk_size, action="store",
+        help="Set chunk size. Has to be multiple of {}.".format(block_size))
     parser_stream.set_defaults(
         root = os.path.abspath(os.path.curdir),
-        chunk_size = config.enc.default_chunk_size,
+        chunk_size = config.default_chunk_size,
     )
 
     parser_fsck = subparsers.add_parser(
@@ -179,19 +187,14 @@ def get_io(args):
     root = os.path.abspath(args.root) if args.root else None
     conf_path = None
     chunk_size = args.chunk_size
-    if chunk_size < config.enc.default_chunk_size or \
-            chunk_size % config.enc.default_chunk_size:
-        print("Chunk size must be multiple of {}.".format(
-            config.enc.default_chunk_size))
-        sys.exit(1)
     if args.conf:
         conf_path = os.path.abspath(args.conf)
     elif root:
-        conf_path = os.path.join(root, config.enc.conf)
-    elif os.path.isfile(os.path.abspath(args.in_file + config.enc.extension)):
-        conf_path = os.path.abspath(args.in_file + config.enc.extension)
+        conf_path = os.path.join(root, config.conf)
+    elif os.path.isfile(os.path.abspath(args.in_file + config.extension)):
+        conf_path = os.path.abspath(args.in_file + config.extension)
     else:
-        conf_path = os.path.abspath(args.out_file + config.enc.extension)
+        conf_path = os.path.abspath(args.out_file + config.extension)
     fcio = None
     if args.key:
         key_path = os.path.abspath(args.key)
@@ -236,9 +239,6 @@ def main():
     args = parse_args()
     signal.signal(signal.SIGINT, signal_handler)
     if args.cmd == 'mount':
-        if args.chunk_size % config.enc.default_chunk_size:
-            print("Chunk size has to be a multiple of 4096.")
-            sys.exit(1)
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
         fcio = get_io(args)
