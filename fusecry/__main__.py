@@ -18,7 +18,8 @@ import subprocess
 import sys
 
 def signal_handler(signal, frame):
-    print("KeyboardInterrupt captured. Stopping FuseCry gracefully.")
+    sys.stderr.write(
+        "KeyboardInterrupt captured. Stopping FuseCry gracefully.\n")
     sys.exit(0)
 
 def check_chunk_size(chunk_size):
@@ -196,29 +197,22 @@ def get_io(args):
     else:
         conf_path = os.path.abspath(args.out_file + config.extension)
     fcio = None
-    if args.key:
-        key_path = os.path.abspath(args.key)
-        try:
+    try:
+        if args.key:
+            key_path = os.path.abspath(args.key)
             fcio = io.RSAFuseCryIO(key_path, root, conf_path, chunk_size)
-        except io.IntegrityCheckException as e:
-            print("Bad key.")
-            sys.exit(1)
-        except io.BadConfException as e:
-            print(e)
-            sys.exit(1)
-    else:
-        password = get_secure_password(args.password) \
-            if os.path.isfile(conf_path) \
-            else get_secure_password_twice(args.password)
-        del args.password # don't keep it plaintext in memory
-        try:
+        else:
+            password = get_secure_password(args.password) \
+                if os.path.isfile(conf_path) \
+                else get_secure_password_twice(args.password)
+            del args.password # don't keep it plaintext in memory
             fcio = io.PasswordFuseCryIO(password, root, conf_path, chunk_size)
-        except io.IntegrityCheckException as e:
-            print("Bad key.")
-            sys.exit(1)
-        except io.BadConfException as e:
-            print(e)
-            sys.exit(1)
+    except io.IntegrityCheckException as e:
+        sys.stderr.write("Bad key.\n")
+        sys.exit(1)
+    except io.BadConfException as e:
+        sys.stderr.write(str(e)+"\n")
+        sys.exit(1)
     return fcio
 
 def get_secure_password(password=None):
@@ -229,10 +223,10 @@ def get_secure_password(password=None):
 def get_secure_password_twice(password=None):
     while not password:
         password = get_secure_password(password)
-        print("Confirm...")
+        sys.stderr.write("Confirm...\n")
         if password != getpass():
             password = None
-            print("\nPasswords did not match. Try again...")
+            sys.stderr.write("\nPasswords did not match. Try again...\n")
     return password
  
 def main():
@@ -242,7 +236,8 @@ def main():
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
         fcio = get_io(args)
-        print("-- FuseCry mounting '{}' to '{}'".format(root, mountpoint))
+        sys.stderr.write("-- FuseCry mounting '{}' to '{}'\n".format(
+            root, mountpoint))
         FUSE(
             FuseCry(
                 root,

@@ -3,6 +3,7 @@ Encrypt or decrypt a single file.
 """
 
 import os
+import sys
 
 
 def encrypt(io, in_path, out_path, info=False):
@@ -15,7 +16,7 @@ def encrypt(io, in_path, out_path, info=False):
             io.write(out_path, in_file.read(io.cs), offset)
             offset += io.cs
     if info:
-        print("-- '{}' encrypted as '{}'".format(in_path, out_path))
+        sys.stderr.write("-- '{}' encrypted as '{}'\n".format(in_path, out_path))
 
 def decrypt(io, in_path, out_path, info=False):
     io.touch(out_path)
@@ -27,6 +28,6 @@ def decrypt(io, in_path, out_path, info=False):
             out_file.write(io.read(in_path, io.cs, offset))
             offset += io.cs
     if info:
-        print("-- '{}' decrypted as '{}'".format(in_path, out_path))
+        sys.stderr.write("-- '{}' decrypted as '{}'\n".format(in_path, out_path))
 
 

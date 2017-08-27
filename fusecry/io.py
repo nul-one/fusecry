@@ -5,6 +5,7 @@ FuseCry IO functions.
 from fusecry import config, cry
 import os
 import struct
+import sys
 
 
 class FuseCryException(Exception):
@@ -21,12 +22,52 @@ class BadConfException(FuseCryException):
 
 
 class ConfData(object):
+    
+    def __str__(self):
+        from textwrap import dedent
+        from Crypto.Hash import MD5
+        if self.type == 'password':
+            md5 = MD5.new()
+            md5.update(self.sample)
+            sample_md5 = md5.digest()
+            return dedent("""
+                type.......:'{}'
+                chunk_size.:'{}'
+                kdf_salt...:'{}'
+                kdf_iters..:'{}'
+                sample_md5.:'{}'
+            """).format(
+                self.type,
+                self.chunk_size,
+                self.kdf_salt,
+                self.kdf_iters,
+                sample_md5,
+                )
+        elif self.type == 'rsakey':
+            md5 = MD5.new()
+            md5.update(self.sample)
+            sample_md5 = md5.digest()
+            return dedent("""
+                type.........:'{}'
+                chunk_size...:'{}'
+                rsa_key_size.:'{}'
+                enc_aes......:'{}'
+                sample_md5...:'{}'
+            """).format(
+                self.type,
+                self.chunk_size,
+                self.rsa_key_size,
+                self.enc_aes,
+                sample_md5,
+                )
+        else:
+            return "error ConfData to str."
 
     def save(self, path=None):
         if path: self.path = path
-        print("-- generating new conf: {}".format(self.path))
-        print("   chunk size: {}".format(self.chunk_size))
-        print("   It's safe to be shared. Decryption won't work if lost.")
+        sys.stderr.write("-- generating new conf: {}\n".format(self.path))
+        sys.stderr.write(
+            "   It's safe to be shared. Decryption won't work if lost.\n")
         if self.type == 'password':
             fmt = '< 8s I {}s I 1024s'.format(config.kdf_salt_size)
             with open(self.path, 'w+b') as f:
