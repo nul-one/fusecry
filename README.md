@@ -44,7 +44,11 @@ individual files)
 compatibility
 -------------------------
 
-Versions 0.4.0 and above are not backwards compatible with previous versions.
+There will be no backwards compatibility guarantee before version 1.0
+
+- Versions 0.6.0 and above are not backwards compatible with previous versions
+- Versions 0.4.0 and above are not backwards compatible with previous versions
+- Versions 0.5.0 and above are not backwards compatible with previous versions
 
 usage
 -------------------------
@@ -79,15 +83,43 @@ decryption.
 ROOT is the source dir that is to be mounted. Make sure it is not mounted
 during fsck or you might get false-positive errors detected.
 
+how does it work?
+-------------------------
+
+### encryption
+
+1. Raw files are split into chunks of N bytes (best speeds are achieved when N
+is equal to your local filesystem block size and defaults to 4096).
+2. Each chunk is hashed with HMAC SHA256.
+3. Hash and chunk data are encrypted with 256bit AES key and random IV
+generated for each chunk.
+4. Random IV and encrypted hash and chunk data are stored in the file.
+5. Repeat 2-4 for each chunk.
+6. Store file size as additional 8 bytes at the end of a file. This way there
+is no need of additional padding bytes for each chunk.
+
+### decryption
+
+1. Read chunk IV and encrypted chunk hash and data for each chunk.
+2. Decrypt hash and data using IV and AES key.
+3. Hash decrypted data and compare with existing decrypted hash.
+4. If hash comparison is ok, store data in raw file, raise error otherwise.
+5. Repeat 1-5 for each chunk.
+6. Read last 8 bytes of encrypted file to determine file size. Truncate raw
+file to fit into this size.
+
+
 known deficiencies and limitations
 -------------------------
 
 - file names are not being encrypted by design
-- chunk size has to be a multiple of 4096
+- chunk size has to be a multiple of 16
 
 future plans and missing features (in no particular order)
 -------------------------
 
 - RAM file system (for fast file access)
 - password change (bulk re-encryption)
+- choice of AES key size
+- choice of hmac digest algorithm
 

@@ -3,7 +3,7 @@ FuseCry encryption functions.
 """
 
 from Crypto.Cipher import AES 
-from Crypto.Hash import MD5 
+from Crypto.Hash import HMAC, SHA256
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.PublicKey import RSA
 from fusecry import config
@@ -39,14 +39,15 @@ def get_rsa_cry(rsa_key, chunk_size, enc_aes=None):
 
 class Cry(object):
     def __init__(self, aes_key):
+        self.hash_func = SHA256
         self.ks = len(aes_key)
         self.vs = AES.block_size
-        self.hs = MD5.digest_size
+        self.hs = self.hash_func.digest_size
         self.aes_key = aes_key
-        self.ms = self.vs + MD5.digest_size
+        self.ms = self.vs + self.hs
 
     def enc(self, chunk):
-        checksum = MD5.new()
+        checksum = HMAC.new(self.aes_key, digestmod=self.hash_func)
         if not chunk:
             return bytes(0)
         chunk += bytes((AES.block_size - len(chunk)) % AES.block_size)
@@ -58,11 +59,12 @@ class Cry(object):
     def dec(self, enc_chunk):
         if not enc_chunk:
             return b'', False
+        checksum = HMAC.new(self.aes_key, digestmod=self.hash_func)
         iv = enc_chunk[:self.vs]
         aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
         chunk = aes.decrypt(enc_chunk[self.vs:])
-        checksum = MD5.new()
-        checksum.update(chunk[MD5.digest_size:])
-        old_checksum = chunk[:MD5.digest_size]
-        return chunk[MD5.digest_size:], old_checksum == checksum.digest()
+        checksum.update(chunk[self.hash_func.digest_size:])
+        old_checksum = chunk[:self.hash_func.digest_size]
+        return (chunk[self.hash_func.digest_size:],
+            old_checksum == checksum.digest())
 

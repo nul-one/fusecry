@@ -179,6 +179,7 @@ def parse_args():
         password = None,
         key = None,
         conf = None,
+        chunk_size = config.default_chunk_size,
     )
 
     argcomplete.autocomplete(parser)
