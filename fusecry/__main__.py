@@ -159,6 +159,14 @@ def parse_args():
         chunk_size = config.default_chunk_size,
     )
 
+    parser_info = subparsers.add_parser(
+        "info",
+        description="Show conf details."
+        )
+    parser_info.add_argument(
+        "conf", type=str, action="store",
+        help="FuseCry conf file (e.g. .fusecry).")
+
     parser_fsck = subparsers.add_parser(
         "fsck",
         description="Perform integrity check on all files and print results."
@@ -272,6 +280,9 @@ def main():
             stream.encrypt(fcio, sys.stdin, sys.stdout)
         elif args.action == 'decrypt':
             stream.decrypt(fcio, sys.stdin, sys.stdout)
+    elif args.cmd == 'info':
+        conf = io.ConfData()
+        conf.load(args.conf, info=True)
     elif args.cmd == 'fsck':
         root = os.path.abspath(args.root)
         fcio = get_io(args)

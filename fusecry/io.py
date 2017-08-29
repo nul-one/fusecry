@@ -33,12 +33,16 @@ class ConfData(object):
             return dedent("""
                 type.......:'{}'
                 chunk_size.:'{}'
+                cipher.....:'{}'
+                hashmod....:'{}'
                 kdf_salt...:'{}'
                 kdf_iters..:'{}'
                 sample_md5.:'{}'
             """).format(
                 self.type,
                 self.chunk_size,
+                self.cipher,
+                self.hashmod,
                 self.kdf_salt,
                 self.kdf_iters,
                 sample_md5,
@@ -50,48 +54,60 @@ class ConfData(object):
             return dedent("""
                 type.........:'{}'
                 chunk_size...:'{}'
+                cipher.......:'{}'
+                hashmod......:'{}'
                 rsa_key_size.:'{}'
-                enc_aes......:'{}'
+                enc_key......:'{}'
                 sample_md5...:'{}'
             """).format(
                 self.type,
                 self.chunk_size,
+                self.cipher,
+                self.hashmod,
                 self.rsa_key_size,
-                self.enc_aes,
+                self.enc_key,
                 sample_md5,
                 )
         else:
             return "error ConfData to str."
 
-    def save(self, path=None):
+    def _zstring(self, zbytes):
+        return zbytes.split(b'\0')[0].decode()
+
+    def save(self, path=None, info=False):
         if path: self.path = path
         sys.stderr.write("-- generating new conf: {}\n".format(self.path))
         sys.stderr.write(
             "   It's safe to be shared. Decryption won't work if lost.\n")
         if self.type == 'password':
-            fmt = '< 8s I {}s I 1024s'.format(config.kdf_salt_size)
+            fmt = '< 8s I 8s 8s {}s I 1024s'.format(config.kdf_salt_size)
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
                     self.type.encode(),
                     self.chunk_size,
+                    self.cipher.encode(),
+                    self.hashmod.encode(),
                     self.kdf_salt,
                     self.kdf_iters,
                     self.sample,
                     ))
         elif self.type == 'rsakey':
-            fmt = '< 8s I I {}s 1024s'.format(self.rsa_key_size)
+            fmt = '< 8s I 8s 8s I {}s 1024s'.format(self.rsa_key_size)
             with open(self.path, 'w+b') as f:
                 f.write(struct.pack(
                     fmt,
                     self.type.encode(),
                     self.chunk_size,
+                    self.cipher.encode(),
+                    self.hashmod.encode(),
                     self.rsa_key_size,
-                    self.enc_aes,
+                    self.enc_key,
                     self.sample,
                     ))
+        if info: sys.stderr.write(str(self))
 
-    def load(self, path=None):
+    def load(self, path=None, info=False):
         if path: self.path = path
         if not os.path.isfile(self.path):
             self.type = None
@@ -101,21 +117,26 @@ class ConfData(object):
             path_data = f.read()
         self.type, self.chunk_size = struct.unpack(
             '< 8s I', path_data[:struct.calcsize('< 8s I')])
-        self.type = self.type.split(b'\0')[0].decode()
+        self.type = self._zstring(self.type)
         if self.type == 'password':
-            # type, chunk_size, kdf_salt, kdf_iters, sample
-            fmt = '< 8s I {}s I 1024s'.format(config.kdf_salt_size)
+            # type, chunk_size, cipher, hashmod, kdf_salt, kdf_iters, sample
+            fmt = '< 8s I 8s 8s {}s I 1024s'.format(config.kdf_salt_size)
             s = struct.Struct(fmt)
-            _, self.chunk_size, self.kdf_salt, self.kdf_iters, self.sample=\
-                s.unpack(path_data)
+            _, self.chunk_size, self.cipher, self.hashmod, self.kdf_salt, \
+                self.kdf_iters, self.sample = s.unpack(path_data)
+            self.cipher = self._zstring(self.cipher)
+            self.hashmod = self._zstring(self.hashmod)
         elif self.type == 'rsakey':
-            _, _, self.rsa_key_size = struct.unpack(
-                '< 8s I I', path_data[:struct.calcsize('< 8s I I')])
-            # type, chunk_size, rsa_key_size, enc_aes, sample
-            fmt = '< 8s I I {}s 1024s'.format(self.rsa_key_size)
+            _, _, _, _, self.rsa_key_size = struct.unpack(
+                '< 8s I 8s 8s I',path_data[:struct.calcsize('< 8s I 8s 8s I')])
+            # type, chunk_size, cipher, hashmod, rsa_key_size, enc_key, sample
+            fmt = '< 8s I 8s 8s I {}s 1024s'.format(self.rsa_key_size)
             s = struct.Struct(fmt)
-            _, self.chunk_size, _, self.enc_aes, self.sample=\
-                s.unpack(path_data)
+            _, self.chunk_size, self.cipher, self.hashmod, _, self.enc_key, \
+                self.sample = s.unpack(path_data)
+            self.cipher = self._zstring(self.cipher)
+            self.hashmod = self._zstring(self.hashmod)
+        if info: sys.stderr.write(str(self))
         return self.type
 
 
@@ -307,6 +328,8 @@ class PasswordFuseCryIO(FuseCryIO):
                 conf_data.sample = cry.get_password_cry(
                     password, conf_data.chunk_size)
             conf_data.type = 'password'
+            conf_data.cipher = 'AES_CBC'
+            conf_data.hashmod = 'SHA256'
             conf_data.save(conf_path)
         super().__init__(crypto, conf_data.chunk_size)
 
@@ -325,7 +348,7 @@ class RSAFuseCryIO(FuseCryIO):
                         conf_data.type))
             try:
                 crypto, _, _, _ = cry.get_rsa_cry(
-                    rsa_key, conf_data.chunk_size, conf_data.enc_aes)
+                    rsa_key, conf_data.chunk_size, conf_data.enc_key)
             except ValueError:
                 raise BadConfException("RSA key did not match.")
             _, ic_pass = crypto.dec(conf_data.sample)
@@ -333,10 +356,12 @@ class RSAFuseCryIO(FuseCryIO):
         else:
             conf_data.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
-            crypto, conf_data.rsa_key_size, conf_data.enc_aes, \
+            crypto, conf_data.rsa_key_size, conf_data.enc_key, \
                 conf_data.sample = cry.get_rsa_cry(
                     rsa_key, conf_data.chunk_size)
             conf_data.type = 'rsakey'
+            conf_data.cipher = 'AES_CBC'
+            conf_data.hashmod = 'SHA256'
             conf_data.save(conf_path)
         super().__init__(crypto, conf_data.chunk_size)
 

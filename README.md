@@ -46,6 +46,7 @@ compatibility
 
 There will be no backwards compatibility guarantee before version 1.0
 
+- Versions 0.7.0 and above are not backwards compatible with previous versions
 - Versions 0.6.0 and above are not backwards compatible with previous versions
 - Versions 0.4.0 and above are not backwards compatible with previous versions
 - Versions 0.5.0 and above are not backwards compatible with previous versions
@@ -82,6 +83,47 @@ decryption.
 `fusecry fsck ROOT [--key RSA_KEY_PATH]`
 ROOT is the source dir that is to be mounted. Make sure it is not mounted
 during fsck or you might get false-positive errors detected.
+
+### info
+
+Use this to show info about encryption:  
+`fusecry info CONF` where `CONF` is the FuseCry config file (e.g. `.fusecry`).
+
+FuseCry conf file
+-------------------------
+
+This is a file where FuseCry stores information about encryption for particular
+ROOT or single encrypted file. It will default to `.fusecry` when mounting or
+`FILE_NAME.fusecry` when encrypting single file.  
+Decryption won't work without this file, so it must be kept safe. It is safe to
+share this file, it won't help attackers in any way.  
+When mounting ROOT to MOUNTPOINT, this file will not be accessible on the
+mountpoint side.
+
+### contents
+
+Depending on encryption type (password or rsa key) there are 2 possible formats
+of Fusecry conf file.
+
+#### password
+
+- 8 bytes: string `password`
+- 4 bytes: unsigned int chunk\_size
+- 8 bytes: string cipher (e.g. `AES_CBC `)
+- 8 bytes: string hashmod (e.g. `SHA256  `)
+- 32 bytes: kdf\_salt
+- 4 bytes: unsigned int kdf\_iters
+- 1024 bytes: encrypted chunk sample
+
+#### rsa key
+
+- 8 bytes: string `rsakey  `
+- 4 bytes: unsigned int chunk\_size
+- 8 bytes: string cipher (e.g. `AES_CBC `)
+- 8 bytes: string hashmod (e.g. `SHA256  `)
+- 4 bytes: unsigned int rsa\_key\_size
+- rsa\_key\_size bytes: rsa encrypted key
+- 1024 bytes: encrypted chunk sample
 
 how does it work?
 -------------------------
