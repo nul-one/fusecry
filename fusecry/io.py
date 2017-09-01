@@ -31,13 +31,13 @@ class ConfData(object):
             md5.update(self.sample)
             sample_md5 = md5.digest()
             return dedent("""
-                type.......:'{}'
-                chunk_size.:'{}'
-                cipher.....:'{}'
-                hashmod....:'{}'
-                kdf_salt...:'{}'
-                kdf_iters..:'{}'
-                sample_md5.:'{}'
+                type       :{}
+                chunk_size :{}
+                cipher     :{}
+                hashmod    :{}
+                kdf_salt   :{}
+                kdf_iters  :{}
+                sample_md5 :{}
             """).format(
                 self.type,
                 self.chunk_size,
@@ -52,13 +52,13 @@ class ConfData(object):
             md5.update(self.sample)
             sample_md5 = md5.digest()
             return dedent("""
-                type.........:'{}'
-                chunk_size...:'{}'
-                cipher.......:'{}'
-                hashmod......:'{}'
-                rsa_key_size.:'{}'
-                enc_key......:'{}'
-                sample_md5...:'{}'
+                type         :{}
+                chunk_size   :{}
+                cipher       :{}
+                hashmod      :{}
+                rsa_key_size :{}
+                enc_key      :{}
+                sample_md5   :{}
             """).format(
                 self.type,
                 self.chunk_size,
@@ -172,20 +172,24 @@ class FuseCryIO(object):
         return buf[sb:sb+rlen]
         
     def write(self, path, buf, offset):
-        xbuf = b''
-        ncc = int(offset / self.cs) # number of untouched chunks
-        if offset > self.filesize(path)[0]:
+        xbuf = buf
+        current_size = self.filesize(path)[0]
+        ncc = int(offset / self.cs) # number of chunks before first modified
+        lmc = int((offset + len(buf)) / self.cs) # last modified chunk
+        if offset > current_size:
             return 0
         if offset % self.cs:
             dec = self.read(path, offset % self.cs, ncc * self.cs)
-            xbuf = dec + buf
-        else:
-            # just right block size
-            xbuf = buf
+            xbuf = dec + xbuf
+        if offset + len(buf) % self.cs:
+            dec = self.read(
+                path,
+                self.cs - ((offset+len(buf)) % self.cs),
+                offset+len(buf)
+                )
+            xbuf = xbuf + dec
         with open(path,'r+b') as f:
-            # Drop file data after crypto offset and add new data
-            s = f.truncate(ncc*(self.ms+self.cs))
-            f.seek(s)
+            f.seek(ncc*(self.ms+self.cs))
             done_length = 0
             while done_length < len(xbuf):
                 chunk = xbuf[done_length:done_length+self.cs]
@@ -193,7 +197,9 @@ class FuseCryIO(object):
                 if not len(chunk):
                     break
                 f.write(self.cry.enc(chunk))
-            f.write(struct.pack('<Q', offset + len(buf)))
+            new_size = offset + len(buf)
+            if new_size > current_size:
+                f.write(struct.pack('<Q', new_size))
         return len(buf)
         
     def truncate(self, path, length):

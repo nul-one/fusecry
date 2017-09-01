@@ -254,6 +254,7 @@ def main():
                 args.debug,
                 ),
             mountpoint,
+            nothreads=False,
             foreground=args.debug
             )
     elif args.cmd == 'umount':
