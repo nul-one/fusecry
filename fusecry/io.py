@@ -77,6 +77,7 @@ class ConfData(object):
 
     def save(self, path=None, info=False):
         if path: self.path = path
+        logging.info("Generated new conf: {}\n".format(self.path))
         sys.stderr.write("-- generating new conf: {}\n".format(self.path))
         sys.stderr.write(
             "   It's safe to be shared. Decryption won't work if lost.\n")

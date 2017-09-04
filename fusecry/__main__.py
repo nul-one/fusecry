@@ -256,7 +256,7 @@ def main():
             format = '%(asctime)s.%(msecs)03d, %(levelname)s: %(message)s',
             datefmt = '%Y-%m-%d %H:%M:%S',
             filename = log_file,
-            level = logging.INFO,
+            level = logging.DEBUG if args.debug else logging.INFO,
             )
         fcio = get_io(args)
         print("-- FuseCry mounting '{}' to '{}'\n".format(root, mountpoint))
@@ -269,7 +269,7 @@ def main():
                 ),
             mountpoint,
             nothreads=False,
-            foreground=args.debug
+            foreground=False
             )
         logging.info("Umount '%s' from '%s'.", root, mountpoint)
     elif args.cmd == 'umount':

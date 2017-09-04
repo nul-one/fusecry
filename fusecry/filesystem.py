@@ -14,14 +14,18 @@ def debug_log(func):
     def function_wrapper(*args, **kwargs):
         if args[0].debug:
             arguments = locals()
-            print('{:.6f} -- {} {}'.format(
-                datetime.timestamp(datetime.now()),
-                func.__name__,
-                [ x for x in args
-                    if type(x) not in (bytes,object) ][1:]
-                ))
+            elements = []
+            for x in args:
+                if type(x) == bytes:
+                    elements.append(len(x))
+                else:
+                    elements.append(x)
+            logging.debug('{} {}'.format(func.__name__, elements[1:]))
         try:
             return func(*args, **kwargs)
+        except FileNotFoundError as e:
+            logging.debug("FuseCry.{} {}".format(func.__name__, e))
+            raise e
         except Exception as e:
             logging.error("FuseCry.{} {}".format(func.__name__, e))
             raise e
