@@ -15,10 +15,12 @@ import os
 import signal
 import subprocess
 import sys
+import logging
 
 def signal_handler(signal, frame):
     sys.stderr.write(
         "KeyboardInterrupt captured. Stopping FuseCry gracefully.\n")
+    logging.info('KeyboardInterrupt received. Stopping debug mode.')
     sys.exit(0)
 
 def check_chunk_size(chunk_size):
@@ -217,9 +219,11 @@ def get_io(args):
             fcio = io.PasswordFuseCryIO(password, root, conf_path, chunk_size)
     except io.IntegrityCheckException as e:
         sys.stderr.write("Bad key.\n")
+        logging.warning("Attempt with a bad key.")
         sys.exit(1)
     except io.BadConfException as e:
         sys.stderr.write(str(e)+"\n")
+        logging.warning(str(e))
         sys.exit(1)
     return fcio
 
@@ -235,16 +239,26 @@ def get_secure_password_twice(password=None):
             password = None
             sys.stderr.write("\nPasswords did not match. Try again...\n")
     return password
- 
+
 def main():
     args = parse_args()
     signal.signal(signal.SIGINT, signal_handler)
     if args.cmd == 'mount':
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
+        log_file = os.path.join(
+            os.path.dirname(mountpoint),
+            "."+os.path.basename(mountpoint)+".fusecry.log"
+            )
+        logging.basicConfig(
+            format = '%(asctime)s.%(msecs)03d, %(levelname)s: %(message)s',
+            datefmt = '%Y-%m-%d %H:%M:%S',
+            filename = log_file,
+            level = logging.INFO,
+            )
         fcio = get_io(args)
-        sys.stderr.write("-- FuseCry mounting '{}' to '{}'\n".format(
-            root, mountpoint))
+        print("-- FuseCry mounting '{}' to '{}'\n".format(root, mountpoint))
+        logging.info("Mount '%s' to '%s'.", root, mountpoint)
         FUSE(
             FuseCry(
                 root,
@@ -255,6 +269,7 @@ def main():
             nothreads=False,
             foreground=args.debug
             )
+        logging.info("Umount '%s' from '%s'.", root, mountpoint)
     elif args.cmd == 'umount':
         subprocess.call(('fusermount','-u', args.mountpoint))
     elif args.cmd == 'encrypt':

@@ -3,6 +3,7 @@ FuseCry IO functions.
 """
 
 from fusecry import config, cry
+import logging
 import os
 import struct
 import sys
@@ -22,7 +23,7 @@ class BadConfException(FuseCryException):
 
 
 class ConfData(object):
-    
+
     def __str__(self):
         from textwrap import dedent
         from Crypto.Hash import MD5
@@ -150,7 +151,9 @@ class FuseCryIO(object):
 
     def check_ic_pass(self, path, check):
         if not check:
-            raise IntegrityCheckException("file: '{}'".format(path))
+            exception = IntegrityCheckException("file: '{}'".format(path))
+            logging.error("IntegrityCheckException %s", str(exception))
+            raise exception
 
     def read(self, path, length, offset):
         buf = b''
@@ -173,7 +176,7 @@ class FuseCryIO(object):
                 self.check_ic_pass(path, ic_pass)
                 buf += dec
         return buf[sb:sb+rlen]
-        
+
     def write(self, path, buf, offset):
         xbuf = buf
         current_size = self.filesize(path)
@@ -204,7 +207,7 @@ class FuseCryIO(object):
             if new_size > current_size:
                 f.write(struct.pack('<Q', new_size))
         return len(buf)
-        
+
     def truncate(self, path, length):
         if length:
             uc = int(length/self.cs) # number of untouched chunks
@@ -217,7 +220,7 @@ class FuseCryIO(object):
         else:
             with open(path, 'r+b') as f:
                 f.truncate(0)
-    
+
     def filesize(self, path):
         def calc_max_size(st_size):
             size = st_size - self.ss
@@ -246,7 +249,7 @@ class FuseCryIO(object):
             if size < min_size or size > max_size:
                 raise_exception(path, size, st_size)
             return size
-    
+
     def attr(self, path):
         st = os.lstat(path)
         attr = dict((key, getattr(st, key)) for key in (
@@ -260,7 +263,7 @@ class FuseCryIO(object):
                     ratio = self.cs / self.ecs
                     attr['st_size'] = int((attr['st_size']-self.ss)*ratio)
         return attr
-    
+
     def touch(self, path, mode=0o644, dir_fd=None, **kwargs):
         flags = os.O_CREAT | os.O_APPEND
         with os.fdopen(
