@@ -146,6 +146,7 @@ class FuseCryIO(object):
         self.ms = self.cry.ms
         self.ss = struct.calcsize('<Q')
         self.cs = chunk_size
+        self.ecs = self.ms + self.cs
 
     def check_ic_pass(self, path, check):
         if not check:
@@ -153,19 +154,21 @@ class FuseCryIO(object):
 
     def read(self, path, length, offset):
         buf = b''
-        size, _ = self.filesize(path)
-        st_size = os.stat(path).st_size
+        size = self.filesize(path)
         rlen = min(length, size - offset)
         if rlen <= 0:
             return buf
         uc = int(offset / self.cs) # number of untouched chunks
         sb = offset % self.cs # skip bytes in first crypto chunk
+        max_buf_len = sb+rlen
         with open(path,'rb') as f:
-            f.seek(uc*(self.ms+self.cs))
-            while len(buf) < (sb+rlen) and f.tell() < st_size - self.ss:
-                cdata = f.read(self.ms+self.cs)
+            f.seek(uc * self.ecs)
+            while len(buf) < max_buf_len:
+                cdata = f.read(self.ecs)
                 if len(cdata) % self.cry.vs:
                     cdata = cdata[:-(len(cdata) % self.cry.vs)]
+                if not len(cdata):
+                    break
                 dec, ic_pass = self.cry.dec(cdata)
                 self.check_ic_pass(path, ic_pass)
                 buf += dec
@@ -173,7 +176,7 @@ class FuseCryIO(object):
         
     def write(self, path, buf, offset):
         xbuf = buf
-        current_size = self.filesize(path)[0]
+        current_size = self.filesize(path)
         uc = int(offset / self.cs) # number of chunks before first modified
         lmc = int((offset + len(buf)) / self.cs) # last modified chunk
         if offset > current_size:
@@ -189,7 +192,7 @@ class FuseCryIO(object):
                 )
             xbuf = xbuf + dec
         with open(path,'r+b') as f:
-            f.seek(uc*(self.ms+self.cs))
+            f.seek(uc * self.ecs)
             done_length = 0
             while done_length < len(xbuf):
                 chunk = xbuf[done_length:done_length+self.cs]
@@ -207,7 +210,7 @@ class FuseCryIO(object):
             uc = int(length/self.cs) # number of untouched chunks
             data = self.read(path, length%self.cs, uc*self.cs)
             with open(path, 'r+b') as f:
-                s = f.truncate(uc*(self.ms+self.cs))
+                s = f.truncate(uc * self.ecs)
                 f.seek(s)
                 f.write(self.cry.enc(data))
                 f.write(struct.pack('<Q', length))
@@ -220,19 +223,17 @@ class FuseCryIO(object):
             size = st_size - self.ss
             if size < 0:
                 return 0
-            max_size = int(size/(self.ms+self.cs))*self.cs
-            last_chunk = size%(self.ms+self.cs) - self.ms
+            max_size = int(size / self.ecs) * self.cs
+            last_chunk = size % self.ecs - self.ms
             if last_chunk > 0:
                 max_size += last_chunk
             return max_size
-        def create_exception(path, size, st_size):
-            return FileSizeException(
-                "file: '{}' size: {} st_size: {}".format(
-                    path, size, st_size))
+        def raise_exception(path, size, st_size):
+            raise FileSizeException(
+                "file: '{}' size: {} st_size: {}".format(path, size, st_size))
         st_size = os.stat(path).st_size
         max_size = calc_max_size(st_size)
         min_size = max_size - self.cry.vs + 1
-        exception = None
         with open(path, 'rb') as f:
             file_end = f.seek(0,os.SEEK_END)
             size = 0
@@ -241,12 +242,10 @@ class FuseCryIO(object):
                 try:
                     size = struct.unpack('<Q', f.read(self.ss))[0]
                 except struct.error as e:
-                    exception = create_exception(path, size, st_size)
-                    size = -1
+                    raise_exception(path, size, st_size)
             if size < min_size or size > max_size:
-                exception = create_exception(path, size, st_size)
-                size = min_size
-            return size, exception
+                raise_exception(path, size, st_size)
+            return size
     
     def attr(self, path):
         st = os.lstat(path)
@@ -256,9 +255,9 @@ class FuseCryIO(object):
         if os.path.isfile(path):
             if attr['st_size']:
                 if os.access(path, os.R_OK):
-                    attr['st_size'], _ = self.filesize(path)
+                    attr['st_size'] = self.filesize(path)
                 else:
-                    ratio = self.cs / (self.ms+self.cs)
+                    ratio = self.cs / self.ecs
                     attr['st_size'] = int((attr['st_size']-self.ss)*ratio)
         return attr
     
@@ -273,10 +272,8 @@ class FuseCryIO(object):
 
     def fsck_file(self, path):
         size = 0
-        size, exception = self.filesize(path)
-        if exception:
-            return "{}: {}".format(type(exception), exception)
         try:
+            size = self.filesize(path)
             offset = 0
             while offset < size:
                 self.read(path, self.cs, offset)
