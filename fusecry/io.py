@@ -181,7 +181,7 @@ class FuseCryIO(object):
         if offset % self.cs:
             dec = self.read(path, offset % self.cs, ncc * self.cs)
             xbuf = dec + xbuf
-        if offset + len(buf) % self.cs:
+        if (offset + len(buf)) % self.cs:
             dec = self.read(
                 path,
                 self.cs - ((offset+len(buf)) % self.cs),
