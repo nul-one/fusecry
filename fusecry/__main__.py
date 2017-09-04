@@ -8,7 +8,6 @@ Main runnable.
 from fuse import FUSE
 from fusecry import single, io, config, stream
 from fusecry.filesystem import FuseCry
-from fusecry.securedata import secure
 from getpass import getpass
 import argcomplete
 import argparse
@@ -226,8 +225,7 @@ def get_io(args):
 
 def get_secure_password(password=None):
     if not password:
-        password = getpass()
-    return secure(password)
+        return getpass()
 
 def get_secure_password_twice(password=None):
     while not password:
