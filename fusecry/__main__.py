@@ -228,7 +228,9 @@ def get_io(args):
     return fcio
 
 def get_secure_password(password=None):
-    if not password:
+    if password:
+        return password
+    else:
         return getpass()
 
 def get_secure_password_twice(password=None):
