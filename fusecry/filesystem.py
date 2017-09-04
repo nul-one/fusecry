@@ -6,6 +6,7 @@ from datetime import datetime
 from fuse import FuseOSError, Operations
 from fusecry import config
 import errno
+import logging
 import os
 
 
@@ -19,7 +20,11 @@ def debug_log(func):
                 [ x for x in args
                     if type(x) not in (bytes,object) ][1:]
                 ))
-        return func(*args, **kwargs)
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error("FuseCry.{} {}".format(func.__name__, e))
+            raise e
     return function_wrapper
 
 class FuseCry(Operations):

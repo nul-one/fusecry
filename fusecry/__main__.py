@@ -280,7 +280,6 @@ def main():
             fcio,
             args.in_file,
             args.out_file,
-            info = True,
             )
     elif args.cmd == 'decrypt':
         fcio = get_io(args)
@@ -288,7 +287,6 @@ def main():
             fcio,
             args.in_file,
             args.out_file,
-            info = True,
             )
     elif args.cmd == 'stream':
         fcio = get_io(args)
