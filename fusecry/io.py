@@ -158,10 +158,10 @@ class FuseCryIO(object):
         rlen = min(length, size - offset)
         if rlen <= 0:
             return buf
-        ncc = int(offset / self.cs) # number of untouched chunks
+        uc = int(offset / self.cs) # number of untouched chunks
         sb = offset % self.cs # skip bytes in first crypto chunk
         with open(path,'rb') as f:
-            f.seek(ncc*(self.ms+self.cs))
+            f.seek(uc*(self.ms+self.cs))
             while len(buf) < (sb+rlen) and f.tell() < st_size - self.ss:
                 cdata = f.read(self.ms+self.cs)
                 if len(cdata) % self.cry.vs:
@@ -174,12 +174,12 @@ class FuseCryIO(object):
     def write(self, path, buf, offset):
         xbuf = buf
         current_size = self.filesize(path)[0]
-        ncc = int(offset / self.cs) # number of chunks before first modified
+        uc = int(offset / self.cs) # number of chunks before first modified
         lmc = int((offset + len(buf)) / self.cs) # last modified chunk
         if offset > current_size:
             return 0
         if offset % self.cs:
-            dec = self.read(path, offset % self.cs, ncc * self.cs)
+            dec = self.read(path, offset % self.cs, uc * self.cs)
             xbuf = dec + xbuf
         if (offset + len(buf)) % self.cs:
             dec = self.read(
@@ -189,7 +189,7 @@ class FuseCryIO(object):
                 )
             xbuf = xbuf + dec
         with open(path,'r+b') as f:
-            f.seek(ncc*(self.ms+self.cs))
+            f.seek(uc*(self.ms+self.cs))
             done_length = 0
             while done_length < len(xbuf):
                 chunk = xbuf[done_length:done_length+self.cs]
@@ -204,10 +204,10 @@ class FuseCryIO(object):
         
     def truncate(self, path, length):
         if length:
-            ncc = int(length/self.cs) # number of untouched chunks
-            data = self.read(path, length%self.cs, ncc*self.cs)
+            uc = int(length/self.cs) # number of untouched chunks
+            data = self.read(path, length%self.cs, uc*self.cs)
             with open(path, 'r+b') as f:
-                s = f.truncate(ncc*(self.ms+self.cs))
+                s = f.truncate(uc*(self.ms+self.cs))
                 f.seek(s)
                 f.write(self.cry.enc(data))
                 f.write(struct.pack('<Q', length))
