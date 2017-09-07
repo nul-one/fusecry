@@ -56,8 +56,8 @@ usage
 
 ### mount/umount
 
-`fusecry mount SOURCE_DIR MOUNT_POINT [--key RSA_KEY_PATH]`
-`fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`
+`fusecry mount SOURCE_DIR MOUNT_POINT [--key RSA_KEY_PATH]`  
+`fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`  
 Data copied to mount point will remain encrypted in source directory.  
 
 ### mount subdirectory
@@ -80,7 +80,7 @@ decryption.
 
 ### fsck
 
-`fusecry fsck ROOT [--key RSA_KEY_PATH]`
+`fusecry fsck ROOT [--key RSA_KEY_PATH]`  
 ROOT is the source dir that is to be mounted. Make sure it is not mounted
 during fsck or you might get false-positive errors detected.
 
