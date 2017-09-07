@@ -164,4 +164,5 @@ future plans and missing features (in no particular order)
 - password change (bulk re-encryption)
 - choice of AES key size
 - choice of hmac digest algorithm
+- option to encrypt file/directory names
 

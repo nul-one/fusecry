@@ -1,7 +1,6 @@
 """
-FuseCry FUSE operations.
+FuseCry implementation of fuse.Operations class and helper functions.
 """
-
 from datetime import datetime
 from fuse import FuseOSError, Operations
 from fusecry import config
@@ -10,28 +9,33 @@ import logging
 import os
 
 
+__printables = lambda x: str(len(x)) if type(x) is bytes else str(x)
+"""Used in debug_log to filter out long bytes and print only their length."""
+
 def debug_log(func):
+    """Function wrapper for logging fuse method calls and errors."""
     def function_wrapper(*args, **kwargs):
         if args[0].debug:
-            arguments = locals()
-            elements = []
-            for x in args:
-                if type(x) == bytes:
-                    elements.append(len(x))
-                else:
-                    elements.append(x)
-            logging.debug('{} {}'.format(func.__name__, elements[1:]))
+            el = map(__printables, args)
+            logging.debug('{} {}'.format(func.__name__, list(el)[1:]))
         try:
             return func(*args, **kwargs)
         except FileNotFoundError as e:
-            logging.debug("FuseCry.{} {}".format(func.__name__, e))
+            el = map(__printables, args)
+            logging.debug("{} - {} {}".format(e, func.__name__, list(el)[1:]))
             raise e
         except Exception as e:
-            logging.error("FuseCry.{} {}".format(func.__name__, e))
+            el = map(__printables, args)
+            logging.error("{} - {} {}".format(e, func.__name__, list(el)[1:]))
             raise e
     return function_wrapper
 
+
 class FuseCry(Operations):
+    """
+    FuseCry implementation of fuse.Operations class.
+    """
+
     def __init__(self, root, io, debug=False):
         self.root = root
         self.debug = debug

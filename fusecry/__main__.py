@@ -2,11 +2,11 @@
 # -*- coding: UTF-8 -*-
 
 """
-Main runnable.
+Main module for FuseCry command line utility.
 """
-
 from fuse import FUSE
 from fusecry import single, io, config, stream
+from fusecry import IntegrityCheckFail, BadConfException
 from fusecry.filesystem import FuseCry
 from getpass import getpass
 import argcomplete
@@ -17,13 +17,15 @@ import subprocess
 import sys
 import logging
 
-def signal_handler(signal, frame):
+def __signal_handler(signal, frame):
+    """Handle keyboard interrupt."""
     sys.stderr.write(
         "KeyboardInterrupt captured. Stopping FuseCry gracefully.\n")
     logging.info('KeyboardInterrupt received. Stopping debug mode.')
     sys.exit(0)
 
-def check_chunk_size(chunk_size):
+def __check_chunk_size(chunk_size):
+    """Raise ValueError if chunk size is not multiple of cipher block sizes."""
     from Crypto.Cipher.AES import block_size
     chunk_size = int(chunk_size)
     if chunk_size % block_size:
@@ -31,7 +33,8 @@ def check_chunk_size(chunk_size):
             "Chunk size should be multiple of {}.".format(block_size))
     return chunk_size
 
-def parse_args():
+def __parse_args():
+    """Parse command line arguments and return an argparse object."""
     from Crypto.Cipher.AES import block_size
     parser = argparse.ArgumentParser(
         prog = "fuse",
@@ -65,7 +68,7 @@ def parse_args():
         "-c", "--conf", type=str, action="store",
         help="Specify or create FuseCry configuration file.")
     parser_mount.add_argument(
-        "--chunk-size", type=check_chunk_size, action="store",
+        "--chunk-size", type=__check_chunk_size, action="store",
         help="Set chunk size. Has to be multiple of {}.".format(block_size))
     parser_mount.set_defaults(
         password = None,
@@ -153,7 +156,7 @@ def parse_args():
         "-k", "--key", type=str, action="store",
         help="Use RSA private key file instead of password.")
     parser_stream.add_argument(
-        "--chunk-size", type=check_chunk_size, action="store",
+        "--chunk-size", type=__check_chunk_size, action="store",
         help="Set chunk size. Has to be multiple of {}.".format(block_size))
     parser_stream.set_defaults(
         root = os.path.abspath(os.path.curdir),
@@ -195,6 +198,7 @@ def parse_args():
     return parser.parse_args()
 
 def get_io(args):
+    """Generate and return FuseCry.io object from command line arguments."""
     root = os.path.abspath(args.root) if args.root else None
     conf_path = None
     chunk_size = args.chunk_size
@@ -212,30 +216,32 @@ def get_io(args):
             key_path = os.path.abspath(args.key)
             fcio = io.RSAFuseCryIO(key_path, root, conf_path, chunk_size)
         else:
-            password = get_secure_password(args.password) \
+            password = __get_secure_password(args.password) \
                 if os.path.isfile(conf_path) \
-                else get_secure_password_twice(args.password)
+                else __get_secure_password_twice(args.password)
             del args.password # don't keep it plaintext in memory
             fcio = io.PasswordFuseCryIO(password, root, conf_path, chunk_size)
-    except io.IntegrityCheckException as e:
+    except IntegrityCheckFail as e:
         sys.stderr.write("Bad key.\n")
         logging.warning("Attempt with a bad key.")
         sys.exit(1)
-    except io.BadConfException as e:
+    except BadConfException as e:
         sys.stderr.write(str(e)+"\n")
         logging.warning(str(e))
         sys.exit(1)
     return fcio
 
-def get_secure_password(password=None):
+def __get_secure_password(password=None):
+    """Ask user to input password if no password is provided."""
     if password:
         return password
     else:
         return getpass()
 
-def get_secure_password_twice(password=None):
+def __get_secure_password_twice(password=None):
+    """Ask user to input and confirm password if no password is provided."""
     while not password:
-        password = get_secure_password(password)
+        password = __get_secure_password(password)
         sys.stderr.write("Confirm...\n")
         if password != getpass():
             password = None
@@ -243,8 +249,9 @@ def get_secure_password_twice(password=None):
     return password
 
 def main():
-    args = parse_args()
-    signal.signal(signal.SIGINT, signal_handler)
+    """Main method of command line utility."""
+    args = __parse_args()
+    signal.signal(signal.SIGINT, __signal_handler)
     if args.cmd == 'mount':
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
