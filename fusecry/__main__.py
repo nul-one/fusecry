@@ -11,11 +11,12 @@ from fusecry.filesystem import FuseCry
 from getpass import getpass
 import argcomplete
 import argparse
+import fusecry
+import logging
 import os
 import signal
 import subprocess
 import sys
-import logging
 
 def __signal_handler(signal, frame):
     """Handle keyboard interrupt."""
@@ -41,8 +42,14 @@ def __parse_args():
         description="Encrypted filesystem based on FUSE."
         )
     parser.add_argument(
+        "-v", "--version", action="store_true",
+        help="Show version info and exit.")
+    parser.add_argument(
         "-d", "--debug", action="store_true",
-        help="Enable debug mode with print output of each fs action.")
+        help="Enable debug mode with output of each fs action in the log.")
+    parser.add_argument(
+        "-D", "--foreground", action="store_true",
+        help="Keep in foreground and direct all logging to stdout.")
     subparsers = parser.add_subparsers(
         description="(use each command with -h for more help)",
         dest="cmd",
@@ -252,6 +259,14 @@ def main():
     """Main method of command line utility."""
     args = __parse_args()
     signal.signal(signal.SIGINT, __signal_handler)
+    if args.version:
+        print("FuseCry {} - Copyright {} {} <{}>".format(
+            fusecry.__version__,
+            fusecry.__year__,
+            fusecry.__author__,
+            fusecry.__author_email__,
+            ))
+        sys.exit(0)
     if args.cmd == 'mount':
         root = os.path.abspath(args.root)
         mountpoint = os.path.abspath(args.mountpoint)
@@ -262,7 +277,7 @@ def main():
         logging.basicConfig(
             format = '%(asctime)s.%(msecs)03d, %(levelname)s: %(message)s',
             datefmt = '%Y-%m-%d %H:%M:%S',
-            filename = log_file,
+            filename = None if args.foreground else log_file,
             level = logging.DEBUG if args.debug else logging.INFO,
             )
         fcio = get_io(args)
@@ -276,7 +291,7 @@ def main():
                 ),
             mountpoint,
             nothreads=False,
-            foreground=False
+            foreground=args.foreground,
             )
         logging.info("Umount '%s' from '%s'.", root, mountpoint)
     elif args.cmd == 'umount':

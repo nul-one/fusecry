@@ -3,7 +3,8 @@ Encrypted filesystem and encryption tool based on FUSE and AES.
 """
 
 __version__ = "0.7.2"
-__licence__ = "GPL v3"
+__licence__ = "BSD"
+__year__ = "2017"
 __author__ = "Predrag Mandic"
 __author_email__ = "github@phlogisto.com"
 
