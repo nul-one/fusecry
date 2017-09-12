@@ -3,228 +3,12 @@ FuseCry IO functions.
 
 Use `PasswordFuseCryIO` or `RSAFuseCryIO` (subclasses of `FuseCryIO`) to read
 and write encrypted files.
-Use `ConfData` to load and save FuseCry conf file.
 """
 from fusecry import config, cry, BadConfException, FileSizeException
 import logging
 import os
 import struct
 import sys
-
-
-class ConfData(object):
-    """Used to load and save FuseCry conf file.
-
-    FuseCry conf file contains data needed for encryption and decryption. Below
-    is the structure of the conf file in case of password or RSA key encryption
-    methods.
-
-    Password encryption conf file::
-
-        8 bytes::       string `password`
-        4 bytes::       unsigned int chunk_size
-        8 bytes::       string cipher (e.g. `AES_CBC`)
-        8 bytes::       string hashmod (e.g. `SHA256`)
-        32 bytes::      kdf_salt
-        4 bytes::       unsigned int kdf_iters
-        1024 bytes::    encrypted chunk sample
-
-    RSA key encryption conf file::
-
-        8 bytes::               string `rsakey`
-        4 bytes::               unsigned int chunk_size
-        8 bytes::               string cipher (e.g. `AES_CBC`)
-        8 bytes::               string hashmod (e.g. `SHA256`)
-        4 bytes::               unsigned int rsa_key_size
-        rsa_key_size bytes::    RSA encrypted AES key
-        1024 bytes::            encrypted chunk sample
-    """
-
-    def __str__(self):
-        """Descriptive string representation of the object."""
-        from textwrap import dedent
-        from Crypto.Hash import MD5
-        if self.type == 'password':
-            md5 = MD5.new()
-            md5.update(self.sample)
-            sample_md5 = md5.digest()
-            return dedent("""
-                type       :{}
-                chunk_size :{}
-                cipher     :{}
-                hashmod    :{}
-                kdf_salt   :{}
-                kdf_iters  :{}
-                sample_md5 :{}
-            """).format(
-                self.type,
-                self.chunk_size,
-                self.cipher,
-                self.hashmod,
-                self.kdf_salt,
-                self.kdf_iters,
-                sample_md5,
-                )
-        elif self.type == 'rsakey':
-            md5 = MD5.new()
-            md5.update(self.sample)
-            sample_md5 = md5.digest()
-            return dedent("""
-                type         :{}
-                chunk_size   :{}
-                cipher       :{}
-                hashmod      :{}
-                rsa_key_size :{}
-                enc_key      :{}
-                sample_md5   :{}
-            """).format(
-                self.type,
-                self.chunk_size,
-                self.cipher,
-                self.hashmod,
-                self.rsa_key_size,
-                self.enc_key,
-                sample_md5,
-                )
-        else:
-            return "error ConfData to str."
-
-    def _zstring(self, zbytes):
-        return zbytes.split(b'\0')[0].decode()
-
-    def save(self, path, info=False):
-        """Save FuseCry conf to a file.
-
-        Object needs to have the following attributes set based on encryption
-        type prior to saving conf file.
-
-        Password encryption conf file::
-            (
-                type (str): `password`,
-                chunk_size (int): multiple of 16; best use your FS block size,
-                cipher (str): `AES_CBC`,
-                hashmod (str): `SHA256`,
-                kdf_salt (bytes): 32 random bytes,
-                kdf_iters (int): number of KDF iterations (best to be 60K+),
-                sample (bytes): encrypt (1024 - Metasize) random bytes,
-            )
-
-        RSA key encryption conf file::
-            (
-                type (str): `rsakey`,
-                chunk_size (int): multiple of 16; best use your FS block size,
-                cipher (str): `AES_CBC`,
-                hashmod (str): `SHA256`,
-                rsa_key_size (int): byte size of your RSA key,
-                enc_key (bytes): encrypt your AES key with RSA and store it,
-                sample (bytes): encrypt (1024 - Metasize) random bytes,
-            )
-
-        Args:
-            path (str): Output file path.
-            info (:obj:`bool`, optional): Prints descriptive info about conf
-                file if set to True. Defaults to False.
-        """
-        if path: self.path = path
-        logging.info("Generated new conf: {}\n".format(self.path))
-        sys.stderr.write("-- generating new conf: {}\n".format(self.path))
-        sys.stderr.write(
-            "   It's safe to be shared. Decryption wont work if lost.\n")
-        if self.type == 'password':
-            fmt = '< 8s I 8s 8s {}s I 1024s'.format(config.kdf_salt_size)
-            with open(self.path, 'w+b') as f:
-                f.write(struct.pack(
-                    fmt,
-                    self.type.encode(),
-                    self.chunk_size,
-                    self.cipher.encode(),
-                    self.hashmod.encode(),
-                    self.kdf_salt,
-                    self.kdf_iters,
-                    self.sample,
-                    ))
-        elif self.type == 'rsakey':
-            fmt = '< 8s I 8s 8s I {}s 1024s'.format(self.rsa_key_size)
-            with open(self.path, 'w+b') as f:
-                f.write(struct.pack(
-                    fmt,
-                    self.type.encode(),
-                    self.chunk_size,
-                    self.cipher.encode(),
-                    self.hashmod.encode(),
-                    self.rsa_key_size,
-                    self.enc_key,
-                    self.sample,
-                    ))
-        if info: sys.stderr.write(str(self))
-
-    def load(self, path, info=False):
-        """Load FuseCry conf from a file.
-
-        Loaded object will get the following attributes based on encryption
-        type. Look at the `save` functiom for more detailed explanation of
-        each of them.
-
-        Password encryption conf file::
-            (
-                type,
-                chunk_size,
-                cipher,
-                hashmod,
-                kdf_salt,
-                kdf_iters,
-                sample,
-            )
-
-        RSA key encryption conf file::
-            (
-                type,
-                chunk_size,
-                cipher,
-                hashmod,
-                rsa_key_size,
-                enc_key,
-                sample,
-            )
-
-        Args:
-            path (str): Input file path.
-            info (:obj:`bool`, optional): Prints descriptive info about conf
-                file if set to True. Defaults to False.
-
-        Returns:
-            str: `password` or `rsakey` based on encryption tipe found.
-        """
-        if path: self.path = path
-        if not os.path.isfile(self.path):
-            self.type = None
-            return self.type
-        path_data = b''
-        with open(self.path, 'rb') as f:
-            path_data = f.read()
-        self.type, self.chunk_size = struct.unpack(
-            '< 8s I', path_data[:struct.calcsize('< 8s I')])
-        self.type = self._zstring(self.type)
-        if self.type == 'password':
-            # type, chunk_size, cipher, hashmod, kdf_salt, kdf_iters, sample
-            fmt = '< 8s I 8s 8s {}s I 1024s'.format(config.kdf_salt_size)
-            s = struct.Struct(fmt)
-            _, self.chunk_size, self.cipher, self.hashmod, self.kdf_salt, \
-                self.kdf_iters, self.sample = s.unpack(path_data)
-            self.cipher = self._zstring(self.cipher)
-            self.hashmod = self._zstring(self.hashmod)
-        elif self.type == 'rsakey':
-            _, _, _, _, self.rsa_key_size = struct.unpack(
-                '< 8s I 8s 8s I',path_data[:struct.calcsize('< 8s I 8s 8s I')])
-            # type, chunk_size, cipher, hashmod, rsa_key_size, enc_key, sample
-            fmt = '< 8s I 8s 8s I {}s 1024s'.format(self.rsa_key_size)
-            s = struct.Struct(fmt)
-            _, self.chunk_size, self.cipher, self.hashmod, _, self.enc_key, \
-                self.sample = s.unpack(path_data)
-            self.cipher = self._zstring(self.cipher)
-            self.hashmod = self._zstring(self.hashmod)
-        if info: sys.stderr.write(str(self))
-        return self.type
 
 
 class FuseCryIO(object):
@@ -475,7 +259,7 @@ class FuseCryIO(object):
                         if len(errors) else "No errors so far." ),
                     ))
                 if os.path.join(r,file_name) !=\
-                        os.path.join(path, config.conf):
+                        os.path.join(path, config._conf):
                     error = self.fsck_file(os.path.join(r, file_name))
                     if error:
                         errors.append(error)
@@ -502,31 +286,30 @@ class PasswordFuseCryIO(FuseCryIO):
                 file system chunk size of root directory or whatever is set in
                 existing conf_path.
         """
-        conf_data = ConfData()
         crypto = None
-        if conf_data.load(conf_path):
-            if conf_data.type != 'password':
+        if config.load(conf_path):
+            if config.type != 'password':
                 raise BadConfException(
                     "Expected conf type: 'password', but found: '{}'".format(
-                        conf_data.type))
+                        config.type))
             crypto, _, _ = cry.get_password_cry(
                 password,
-                conf_data.kdf_salt,
-                conf_data.kdf_iters
+                config.kdf_salt,
+                config.kdf_iters
                 )
-            _ = crypto.dec(conf_data.sample)
+            _ = crypto.dec(config.sample)
         else:
-            conf_data.chunk_size = chunk_size if chunk_size \
+            config.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
-            crypto, conf_data.kdf_salt, conf_data.kdf_iters \
+            crypto, config.kdf_salt, config.kdf_iters \
                 = cry.get_password_cry(password)
-            conf_data.sample = crypto.enc(
+            config.sample = crypto.enc(
                 os.urandom(config.sample_size - crypto.ms))
-            conf_data.type = 'password'
-            conf_data.cipher = 'AES_CBC'
-            conf_data.hashmod = 'SHA256'
-            conf_data.save(conf_path)
-        super().__init__(crypto, conf_data.chunk_size)
+            config.type = 'password'
+            config.cipher = 'AES_CBC'
+            config.hashmod = 'SHA256'
+            config.save(conf_path)
+        super().__init__(crypto, config.chunk_size)
 
 
 class RSAFuseCryIO(FuseCryIO):
@@ -544,31 +327,30 @@ class RSAFuseCryIO(FuseCryIO):
                 file system chunk size of root directory or whatever is set in
                 existing conf_path.
         """
-        conf_data = ConfData()
         rsa_key = None
         crypto = None
         with open(key_path, 'rb') as f:
             rsa_key = f.read()
-        if conf_data.load(conf_path):
-            if conf_data.type != 'rsakey':
+        if config.load(conf_path):
+            if config.type != 'rsakey':
                 raise BadConfException(
                     "Expected conf type: 'rsakey', but found: '{}'".format(
-                        conf_data.type))
+                        config.type))
             try:
-                crypto, _, _ = cry.get_rsa_cry(rsa_key, conf_data.enc_key)
+                crypto, _, _ = cry.get_rsa_cry(rsa_key, config.enc_key)
             except ValueError:
                 raise BadConfException("RSA key did not match.")
-            _ = crypto.dec(conf_data.sample)
+            _ = crypto.dec(config.sample)
         else:
-            conf_data.chunk_size = chunk_size if chunk_size \
+            config.chunk_size = chunk_size if chunk_size \
                 else os.statvfs(root).f_bsize
-            crypto, conf_data.rsa_key_size, conf_data.enc_key \
+            crypto, config.rsa_key_size, config.enc_key \
                 = cry.get_rsa_cry(rsa_key)
-            conf_data.sample = crypto.enc(
+            config.sample = crypto.enc(
                 os.urandom(config.sample_size - crypto.ms))
-            conf_data.type = 'rsakey'
-            conf_data.cipher = 'AES_CBC'
-            conf_data.hashmod = 'SHA256'
-            conf_data.save(conf_path)
-        super().__init__(crypto, conf_data.chunk_size)
+            config.type = 'rsakey'
+            config.cipher = 'AES_CBC'
+            config.hashmod = 'SHA256'
+            config.save(conf_path)
+        super().__init__(crypto, config.chunk_size)
 

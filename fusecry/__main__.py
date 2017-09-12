@@ -81,7 +81,7 @@ def __parse_args():
         password = None,
         key=None,
         conf = None,
-        chunk_size = config.default_chunk_size,
+        chunk_size = config._default_chunk_size,
     )
 
     parser_umount = subparsers.add_parser(
@@ -116,7 +116,7 @@ def __parse_args():
         password = None,
         key = None,
         conf = None,
-        chunk_size = config.default_chunk_size,
+        chunk_size = config._default_chunk_size,
     )
 
     parser_decrypt = subparsers.add_parser(
@@ -143,7 +143,7 @@ def __parse_args():
         password = None,
         key = None,
         conf = None,
-        chunk_size = config.default_chunk_size,
+        chunk_size = config._default_chunk_size,
     )
 
     parser_stream = subparsers.add_parser(
@@ -167,7 +167,7 @@ def __parse_args():
         help="Set chunk size. Has to be multiple of {}.".format(block_size))
     parser_stream.set_defaults(
         root = os.path.abspath(os.path.curdir),
-        chunk_size = config.default_chunk_size,
+        chunk_size = config._default_chunk_size,
     )
 
     parser_info = subparsers.add_parser(
@@ -198,7 +198,7 @@ def __parse_args():
         password = None,
         key = None,
         conf = None,
-        chunk_size = config.default_chunk_size,
+        chunk_size = config._default_chunk_size,
     )
 
     argcomplete.autocomplete(parser)
@@ -212,7 +212,7 @@ def get_io(args):
     if args.conf:
         conf_path = os.path.abspath(args.conf)
     elif root:
-        conf_path = os.path.join(root, config.conf)
+        conf_path = os.path.join(root, config._conf)
     elif os.path.isfile(os.path.abspath(args.in_file + config.extension)):
         conf_path = os.path.abspath(args.in_file + config.extension)
     else:
@@ -317,8 +317,8 @@ def main():
         elif args.action == 'decrypt':
             stream.decrypt(fcio, sys.stdin, sys.stdout)
     elif args.cmd == 'info':
-        conf = io.ConfData()
-        conf.load(args.conf, info=True)
+        config.load(args.conf)
+        print(str(config))
     elif args.cmd == 'fsck':
         root = os.path.abspath(args.root)
         fcio = get_io(args)

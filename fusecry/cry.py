@@ -63,7 +63,7 @@ def get_password_cry(password, kdf_salt=None, kdf_iters=None):
     """
     key_size = AES.key_size[2] # 256 bit key
     kdf_salt = kdf_salt or os.urandom(config.kdf_salt_size)
-    kdf_iters = kdf_iters or randint(*config.kdf_iter_range)
+    kdf_iters = kdf_iters or randint(*config._kdf_iter_range)
     aes_key = PBKDF2(str(password), kdf_salt, key_size, kdf_iters)
     crypto = Cry(aes_key)
     return crypto, kdf_salt, kdf_iters
