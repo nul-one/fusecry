@@ -39,7 +39,7 @@ class FuseCry(Operations):
     def __init__(self, root, io, debug=False):
         self.root = root
         self.debug = debug
-        self.conf = os.path.join(self.root, config.conf)
+        self.conf = os.path.join(self.root, config._conf)
         self.io = io
 
     def __real_path(self, path):
@@ -82,8 +82,8 @@ class FuseCry(Operations):
         if os.path.isdir(real_path):
             dirents.extend(os.listdir(real_path))
             if os.path.abspath(real_path) == os.path.abspath(self.root):
-                if config.conf in dirents:
-                    dirents.remove(config.conf)
+                if config._conf in dirents:
+                    dirents.remove(config._conf)
         for r in dirents:
             yield r
 
