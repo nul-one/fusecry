@@ -4,7 +4,7 @@ fusecry
 [![Build Status](https://travis-ci.org/nul-one/fusecry.png)](https://travis-ci.org/nul-one/fusecry)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fusecry/Lobby)
 
-FUSE based encrypted (AES.MODE\_CBC) filesystem and encryption tool
+FUSE based AES encrypted filesystem and encryption tool
 
 requirements
 -------------------------
