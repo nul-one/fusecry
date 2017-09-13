@@ -44,13 +44,12 @@ individual files)
 compatibility
 -------------------------
 
-There will be no backwards compatibility guarantee before version 1.0
-
-- Versions 0.8.0 and above are not backwards compatible with previous versions
-- Versions 0.7.0 and above are not backwards compatible with previous versions
-- Versions 0.6.0 and above are not backwards compatible with previous versions
-- Versions 0.5.0 and above are not backwards compatible with previous versions
-- Versions 0.4.0 and above are not backwards compatible with previous versions
+There will be no backwards compatibility guarantee before version 1.0.0  
+Minor versions before version 1.0.0 are incompatible between each other (e.g.
+version 0.**8**.0 and 0.**7**.0 are incompatible), while patch versions of the
+same minor versions are compatible (e.g. 0.7.**1** and 0.7.**2**)  
+After 1.0.0 release, all future releases of the same major versions are
+guaranteed to be compatible.
 
 usage
 -------------------------
