@@ -112,7 +112,7 @@ class FuseCryIO(object):
             new_size = offset + len(buf)
             if new_size > current_size:
                 f.write(struct.pack('<Q', new_size))
-        return done_length
+        return len(buf)
 
     def truncate(self, path, length):
         """Truncate file.
