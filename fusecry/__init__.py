@@ -38,8 +38,11 @@ class FuseCryConf(object):
     def __str__(self):
         info = { key: value for key, value in self.__dict__.items() \
                 if key[0] is not "_" }
-        return json.dumps(
-            info, sort_keys=True, indent=4, separators=(',', ': '))
+        s = ""
+        for key, value in self.__dict__.items():
+            if key[0] is not "_":
+                s += key.replace("_", " ") + ": " + str(value) + "\n"
+        return s
 
     @property
     def enc_key(self):
