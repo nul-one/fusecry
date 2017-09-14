@@ -118,10 +118,11 @@ class Cry(object):
 
     Attributes:
         hash_func (function): Function used for HMAC hashing.
+        aes_key (bytes): AES key in plain text.
+        hashed_aes_key (bytes): Hash value of aes_key used as HMAC key.
         ks (int): AES key size.
         vs (int): AES initialization vector size.
         hs (int): Digest size of hash function defined in attribute hash_func.
-        aes_key (bytes): AES key in plain text.
         ms (int): Meta size - size of non-data part of encrypted chunk. This
             meta data consists of IV and HMAC.
     """
@@ -133,10 +134,13 @@ class Cry(object):
             aes_key (bytes): Plain text AES key.
         """
         self.hash_func = SHA256
+        self.aes_key = aes_key
+        aes_hasher = self.hash_func.new()
+        aes_hasher.update(aes_key)
+        self.hashed_aes_key = aes_hasher.digest()
         self.ks = len(aes_key)
         self.vs = AES.block_size
         self.hs = self.hash_func.digest_size
-        self.aes_key = aes_key
         self.ms = self.vs + self.hs
 
     def enc(self, chunk):
@@ -150,17 +154,19 @@ class Cry(object):
         Returns:
             bytes: Encrypted chunk.
 
-            Encrypted chunk is bytes object consisting of IV, HMAC and
-            encrypted bytes in that order.
+            Encrypted chunk is bytes object consisting of TAG and cipher text.
+            Cipher text is IV + encrypted chunk. TAG is HMAC of cipher text
+            using hashed_aes_key as key.
         """
-        checksum = HMAC.new(self.aes_key, digestmod=self.hash_func)
         if not chunk:
             return bytes(0)
+        checksum = HMAC.new(self.hashed_aes_key, digestmod=self.hash_func)
         chunk += bytes((AES.block_size - len(chunk)) % AES.block_size)
-        checksum.update(chunk)
         iv = os.urandom(self.vs)
         aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
-        return iv + aes.encrypt(checksum.digest() + chunk)
+        enc_data = iv + aes.encrypt(chunk)
+        checksum.update(enc_data)
+        return checksum.digest() + enc_data
 
     def dec(self, enc_chunk):
         """Decrypt encrypted chunk, perform validation and return plain text.
@@ -176,12 +182,11 @@ class Cry(object):
         """
         if not enc_chunk:
             return b'', False
-        checksum = HMAC.new(self.aes_key, digestmod=self.hash_func)
-        iv = enc_chunk[:self.vs]
-        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
-        chunk = aes.decrypt(enc_chunk[self.vs:])
-        checksum.update(chunk[self.hs:])
-        if chunk[:self.hs] != checksum.digest():
+        checksum = HMAC.new(self.hashed_aes_key, digestmod=self.hash_func)
+        checksum.update(enc_chunk[self.hs:])
+        if enc_chunk[:self.hs] != checksum.digest():
             raise IntegrityCheckFail("Integrity check failed.")
-        return chunk[self.hs:]
+        iv = enc_chunk[self.hs:self.hs+self.vs]
+        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
+        return aes.decrypt(enc_chunk[self.hs+self.vs:])
 
