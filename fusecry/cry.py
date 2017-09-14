@@ -1,7 +1,7 @@
 """
 FuseCry encryption functions.
 
-Use Cry objects `enc` and `dec` methods to encrypt and decrypt data.
+Cry objects `enc` and `dec` methods are symetric encrypt/decrypt functions.
 Use `get_password_cry` and `get_rsa_cry` to generate proper Cry object.
 
 Examples:
@@ -20,11 +20,6 @@ Examples:
     Generate existing Cry object with RSA key and RSA encrypted AES key:
 
         get_rsa_cry(rsa_key, encrypted_aes_key)
-
-Todo:
-    * Add additional encryption methods like Blowfish
-    * Add additional HMAC digest modes like MD5
-    * Make HMAC validation optional
 """
 from Crypto.Cipher import AES 
 from Crypto.Hash import HMAC, SHA256
