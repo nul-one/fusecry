@@ -31,8 +31,6 @@ def debug_log(func):
     return function_wrapper
 
 
-
-
 class FuseCry(Operations):
     """
     FuseCry implementation of fuse.Operations class.
@@ -41,11 +39,14 @@ class FuseCry(Operations):
     def __init__(self, root, io, debug=False):
         def __path_to_dict(path, enc_name=None):
             """Represent file and directory structure as dict."""
-            st = os.stat(path)
+            st = None
+            try:
+                st = os.stat(path)
+            except FileNotFoundError:
+                pass
             result = {}
-            result['stat'] = st
             result['enc_name'] = enc_name
-            if stat.S_ISDIR(st.st_mode):
+            if st and stat.S_ISDIR(st.st_mode):
                 result['items'] = {}
                 for enc_name in os.listdir(path):
                     if enc_name != config._conf:
@@ -65,7 +66,6 @@ class FuseCry(Operations):
         self.debug = debug
 
     def __crypto_real_path(self, path):
-        #raise Exception("NOT IMPLEMENTED YET")
         path_split = filter(bool, path.split(os.path.sep))
         fs_map = self.fs_map
         real_path = self.root
@@ -188,10 +188,9 @@ class FuseCry(Operations):
     @debug_log
     def symlink(self, name, target):
         real_name = self.real_path(name)
-        real_target = self.real_path(target)
+        real_target = target
         if real_name == self.conf_path: return None
-        if real_target == self.conf_path: return None
-        return os.symlink(real_target, real_name)
+        return os.symlink(target, real_name)
 
     @debug_log
     def rename(self, old, new):
