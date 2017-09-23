@@ -29,26 +29,30 @@ features
 -------------------------
 
 - mount any subdirectory of encrypted structure
-- encrypt with password or RSA key
-- encrypt/decrypt single files
-- encrypt/decrypt streams
+- use password or RSA key
+- encrypt single files
+- encrypt streams
 - real time integrity check
 - filesystem check
-- check if password/RSA key is valid before mounting
-- detect local FS block size for best performance
-- option to choose chunk size to optimize for READ or WRITE
-- encrypted files keep same file names and directory structure (good for backup
-solutions like DropBox where you have option to roll-back previous versions of
-individual files)
+- detect local FS block size for best overall performance or set manually
+- encrypt file and directory names
+- encrypted files keep same directory structure
+- option to have file and path names encrypted
 
 usage
 -------------------------
 
 ### mount/umount
 
-`fusecry mount SOURCE_DIR MOUNT_POINT [--key RSA_KEY_PATH]`  
+`fusecry mount SOURCE_DIR MOUNT_POINT [--key RSA_KEY_PATH] [-n]`  
 `fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`  
 Data copied to mount point will remain encrypted in source directory.  
+Use `-n` or `--encrypt-filenames` to also have file and directory names
+encrypted. This option is really needed only on the first mount when FuseCry
+config file is being generated.  
+**Watch out**: if `-n` is used, actual file and directory names on disk will be
+60%+ longer than originals and thus some long names won't be valid! Check what
+maximum filename and path length values are on your system.
 
 ### mount subdirectory
 
@@ -82,13 +86,13 @@ Use this to show info about encryption:
 FuseCry conf file
 -------------------------
 
-This is a file where FuseCry stores information about encryption for particular
-ROOT or single encrypted file. It will default to `.fusecry` when mounting or
-`FILE_NAME.fusecry` when encrypting single file.  
-Decryption won't work without this file, so it must not be lost. It is safe to
-share this file, it won't help attackers in any way.  
-When mounting ROOT to MOUNTPOINT, this file will not be accessible on the
-mountpoint side.
+This is a json file where FuseCry stores information about encryption for
+particular ROOT or single encrypted file. It will default to `.fusecry` when
+mounting or `FILE_NAME.fusecry` when encrypting single file.  
+**Important**: Decryption won't work without this file, so it must not be lost.
+It is safe to share this file, it won't help attackers in any way.  
+When mounting ROOT to MOUNTPOINT, this file will not be accessible (visible) on
+the mountpoint side.
 
 how does it work?
 -------------------------
@@ -117,6 +121,13 @@ file read output).
 file to fit into this size (or truncate last read block before returning as
 file read output).
 
+### file and directory name encryption
+
+Raw names are converted to bytes and zero padded and then encrypted as a
+single chunk with random IV for each file/dir. Output is then encrypted and
+encoded with base32 with `=` padding stripped from the end.  
+There is no integrity check when decrypting file names.
+
 backward compatibility
 -------------------------
 
@@ -124,22 +135,23 @@ There will be no backwards compatibility guarantee before version 1.0.0
 Minor versions before version 1.0.0 are incompatible between each other (e.g.
 version 0.**8**.0 and 0.**7**.0 are incompatible), while patch versions of the
 same minor versions are compatible (e.g. 0.7.**1** and 0.7.**2**)  
-After 1.0.0 release, all future releases of the same major versions are
-guaranteed to be compatible.
+After 1.0.0 release, all future releases of the same major versions will have
+guaranteed backward and forward compatibility.
 
 known limitations and deficiencies
 -------------------------
 
-- file names are not being encrypted at the moment
+- no options for AES keysize (has to be 256bit)
 - chunk size has to be a multiple of 16
+- no integrity check of file and directory names and structure
+- in case of encrypted file/dir names, whole directory structure is loaded in
+RAM
 
 future plans and missing features (in no particular order)
 -------------------------
 
-- RAM file system (for fast file access)
+- RAM file system option for fast file access
 - password change (bulk re-encryption)
-- option to encrypt file/directory names
-
-[//]: # "- choice of AES key size"
-[//]: # "- choice of hmac digest algorithm"
+- dinamyc directory structure loading for encrypted file/dir names to preserve
+RAM
 

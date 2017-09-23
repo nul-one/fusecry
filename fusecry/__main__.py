@@ -73,7 +73,10 @@ def __parse_args():
         help="Specify RSA key file instead of using password for encryption.")
     parser_mount.add_argument(
         "-c", "--conf", type=str, action="store",
-        help="Specify or create FuseCry configuration file.")
+        help="Specify existing or new FuseCry configuration file.")
+    parser_mount.add_argument(
+        "-n", "--encrypt-filenames", action="store_true",
+        help="Option to encrypt file names when running for the first time.")
     parser_mount.add_argument(
         "--chunk-size", type=__check_chunk_size, action="store",
         help="Set chunk size. Has to be multiple of {}.".format(block_size))
@@ -81,6 +84,7 @@ def __parse_args():
         password = None,
         key=None,
         conf = None,
+        encrypt_filenames = False,
         chunk_size = config._default_chunk_size,
     )
 
@@ -209,6 +213,8 @@ def get_io(args):
     root = os.path.abspath(args.root) if args.root else None
     conf_path = None
     chunk_size = args.chunk_size
+    if hasattr(args, 'encrypt_filenames') and args.encrypt_filenames:
+        config.enc_path = True
     if args.conf:
         conf_path = os.path.abspath(args.conf)
     elif root:
@@ -223,9 +229,9 @@ def get_io(args):
             key_path = os.path.abspath(args.key)
             fcio = io.RSAFuseCryIO(key_path, root, conf_path, chunk_size)
         else:
-            password = __get_secure_password(args.password) \
+            password = __get_password(args.password) \
                 if os.path.isfile(conf_path) \
-                else __get_secure_password_twice(args.password)
+                else __get_password_twice(args.password)
             del args.password # don't keep it plaintext in memory
             fcio = io.PasswordFuseCryIO(password, root, conf_path, chunk_size)
     except IntegrityCheckFail as e:
@@ -238,17 +244,17 @@ def get_io(args):
         sys.exit(1)
     return fcio
 
-def __get_secure_password(password=None):
+def __get_password(password=None):
     """Ask user to input password if no password is provided."""
     if password:
         return password
     else:
         return getpass()
 
-def __get_secure_password_twice(password=None):
+def __get_password_twice(password=None):
     """Ask user to input and confirm password if no password is provided."""
     while not password:
-        password = __get_secure_password(password)
+        password = __get_password(password)
         sys.stderr.write("Confirm...\n")
         if password != getpass():
             password = None
@@ -287,7 +293,7 @@ def main():
             FuseCry(
                 root,
                 fcio,
-                args.debug,
+                debug=args.debug,
                 ),
             mountpoint,
             nothreads=False,

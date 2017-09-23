@@ -7,7 +7,7 @@ from fusecry import config
 import errno
 import logging
 import os
-
+import stat
 
 __printables = lambda x: str(len(x)) if type(x) is bytes else str(x)
 """Used in debug_log to filter out long bytes and print only their length."""
@@ -31,16 +31,55 @@ def debug_log(func):
     return function_wrapper
 
 
+
+
 class FuseCry(Operations):
     """
     FuseCry implementation of fuse.Operations class.
     """
 
     def __init__(self, root, io, debug=False):
+        def __path_to_dict(path, enc_name=None):
+            """Represent file and directory structure as dict."""
+            st = os.stat(path)
+            result = {}
+            result['stat'] = st
+            result['enc_name'] = enc_name
+            if stat.S_ISDIR(st.st_mode):
+                result['items'] = {}
+                for enc_name in os.listdir(path):
+                    if enc_name != config._conf:
+                        result['items'][self.io.cry.dec_filename(enc_name)] = \
+                            __path_to_dict(os.path.join(path,enc_name), enc_name)
+            return result
+
         self.root = root
-        self.debug = debug
-        self.conf = os.path.join(self.root, config._conf)
         self.io = io
+        if config.enc_path:
+            self.real_path = self.__crypto_real_path
+            self.fs_map = __path_to_dict(root)
+        else:
+            self.real_path = self.__real_path
+            self.fs_map = None
+        self.conf_path = os.path.join(self.root, config._conf)
+        self.debug = debug
+
+    def __crypto_real_path(self, path):
+        #raise Exception("NOT IMPLEMENTED YET")
+        path_split = filter(bool, path.split(os.path.sep))
+        fs_map = self.fs_map
+        real_path = self.root
+        for name in path_split:
+            if 'items' not in fs_map:
+                fs_map['items'] = {}
+            if name not in fs_map['items']:
+                fs_map['items'][name] = {
+                    'enc_name': self.io.cry.enc_filename(name)
+                }
+            real_path = os.path.join(
+                real_path, fs_map['items'][name]['enc_name'])
+            fs_map = fs_map['items'][name]
+        return real_path
 
     def __real_path(self, path):
         if path.startswith(os.path.sep):
@@ -52,45 +91,52 @@ class FuseCry(Operations):
 
     @debug_log
     def access(self, path, mode):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         if not os.access(real_path, mode):
             raise FuseOSError(errno.EACCES)
 
     @debug_log
     def chmod(self, path, mode):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.chmod(real_path, mode)
 
     @debug_log
     def chown(self, path, uid, gid):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.chown(real_path, uid, gid)
 
     @debug_log
     def getattr(self, path, fh=None):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return self.io.attr(real_path)
 
     @debug_log
     def readdir(self, path, fh):
-        real_path = self.__real_path(path)
+        real_path = self.real_path(path)
         dirents = ['.', '..']
         if os.path.isdir(real_path):
             dirents.extend(os.listdir(real_path))
             if os.path.abspath(real_path) == os.path.abspath(self.root):
                 if config._conf in dirents:
                     dirents.remove(config._conf)
-        for r in dirents:
-            yield r
+        if config.enc_path:
+            for r in dirents:
+                if r in ('.','..'):
+                    yield r
+                else:
+                    yield self.io.cry.dec_filename(r)
+        else:
+            for r in dirents:
+                yield r
 
     @debug_log
     def readlink(self, path):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         pathname = os.readlink(real_path)
         if pathname.startswith("/"):
             # Path name is absolute, sanitize it.
@@ -100,26 +146,26 @@ class FuseCry(Operations):
 
     @debug_log
     def mknod(self, path, mode, dev):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
-        return os.mknod(self.real_path, mode, dev)
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
+        return os.mknod(real_path, mode, dev)
 
     @debug_log
     def rmdir(self, path):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.rmdir(real_path)
 
     @debug_log
     def mkdir(self, path, mode):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.mkdir(real_path, mode)
 
     @debug_log
     def statfs(self, path):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         stv = os.statvfs(real_path)
         stat = dict((key, getattr(stv, key)) for key in (
             'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
@@ -135,38 +181,38 @@ class FuseCry(Operations):
 
     @debug_log
     def unlink(self, path):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.unlink(real_path)
 
     @debug_log
     def symlink(self, name, target):
-        real_name = self.__real_path(name)
-        real_target = self.__real_path(target)
-        if real_name == self.conf: return None
-        if real_target == self.conf: return None
+        real_name = self.real_path(name)
+        real_target = self.real_path(target)
+        if real_name == self.conf_path: return None
+        if real_target == self.conf_path: return None
         return os.symlink(real_target, real_name)
 
     @debug_log
     def rename(self, old, new):
-        real_old = self.__real_path(old)
-        real_new = self.__real_path(new)
-        if real_old == self.conf: return None
-        if real_new == self.conf: return None
+        real_old = self.real_path(old)
+        real_new = self.real_path(new)
+        if real_old == self.conf_path: return None
+        if real_new == self.conf_path: return None
         return os.rename(real_old, real_new)
 
     @debug_log
     def link(self, target, name):
-        real_target = self.__real_path(target)
-        real_name = self.__real_path(name)
-        if real_target == self.conf: return None
-        if real_name == self.conf: return None
+        real_target = self.real_path(target)
+        real_name = self.real_path(name)
+        if real_target == self.conf_path: return None
+        if real_name == self.conf_path: return None
         return os.link(real_name, real_target)
 
     @debug_log
     def utimens(self, path, times=None):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.utime(real_path, times)
 
     # File methods
@@ -174,50 +220,50 @@ class FuseCry(Operations):
 
     @debug_log
     def open(self, path, flags):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.open(real_path, flags)
 
     @debug_log
     def create(self, path, mode, fi=None):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.open(real_path, os.O_WRONLY | os.O_CREAT, mode)
 
     @debug_log
     def read(self, path, length, offset, fh):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None, False
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None, False
         return self.io.read(real_path, length, offset)
 
     @debug_log
     def write(self, path, buf, offset, fh):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return self.io.write(real_path, buf, offset)
 
     @debug_log
     def truncate(self, path, length, fh=None):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return self.io.truncate(real_path, length)
 
     @debug_log
     def flush(self, path, fh):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.fsync(fh)
 
     @debug_log
     def release(self, path, fh):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return os.close(fh)
 
     @debug_log
     def fsync(self, path, fdatasync, fh):
-        real_path = self.__real_path(path)
-        if real_path == self.conf: return None
+        real_path = self.real_path(path)
+        if real_path == self.conf_path: return None
         return self.flush(path, fh)
 
 

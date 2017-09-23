@@ -25,6 +25,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA256
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.PublicKey import RSA
+from base64 import b32encode, b32decode
 from fusecry import IntegrityCheckFail
 from fusecry import config
 from random import randint
@@ -138,6 +139,16 @@ class Cry(object):
         self.hs = self.hash_func.digest_size
         self.ms = self.vs + self.hs
 
+    def _aes_enc(self, raw_bytes):
+        iv = os.urandom(self.vs)
+        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
+        return iv + aes.encrypt(raw_bytes)
+
+    def _aes_dec(self, enc_bytes):
+        iv = enc_bytes[:self.vs]
+        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
+        return aes.decrypt(enc_bytes[self.vs:])
+
     def enc(self, chunk):
         """Encrypt a chunk of bytes and returned encrypted chunk.
 
@@ -157,9 +168,7 @@ class Cry(object):
             return bytes(0)
         checksum = HMAC.new(self.hashed_aes_key, digestmod=self.hash_func)
         chunk += bytes((AES.block_size - len(chunk)) % AES.block_size)
-        iv = os.urandom(self.vs)
-        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
-        enc_data = iv + aes.encrypt(chunk)
+        enc_data = self._aes_enc(chunk)
         checksum.update(enc_data)
         return checksum.digest() + enc_data
 
@@ -181,7 +190,15 @@ class Cry(object):
         checksum.update(enc_chunk[self.hs:])
         if enc_chunk[:self.hs] != checksum.digest():
             raise IntegrityCheckFail("Integrity check failed.")
-        iv = enc_chunk[self.hs:self.hs+self.vs]
-        aes = AES.new(self.aes_key, AES.MODE_CBC, iv)
-        return aes.decrypt(enc_chunk[self.hs+self.vs:])
+        return self._aes_dec(enc_chunk[self.hs:])
+
+    def enc_filename(self, path):
+        byte_path = path.encode()
+        byte_path +=  bytes((AES.block_size - len(byte_path)) % AES.block_size)
+        return b32encode(self._aes_enc(byte_path)).decode().rstrip('=')
+
+    def dec_filename(self, enc_path):
+        enc_path += '=' * ((8 - len(enc_path)) % 8)
+        byte_path = self._aes_dec(b32decode(enc_path.encode()))
+        return byte_path.rstrip(bytes(1)).decode()
 

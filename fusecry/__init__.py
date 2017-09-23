@@ -5,7 +5,7 @@ import base64
 import json
 import os
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __licence__ = "BSD"
 __year__ = "2017"
 __author__ = "Predrag Mandic"
@@ -90,6 +90,7 @@ config = FuseCryConf(
         "_conf": '.fusecry',
         "sample_size": 1024,
         "_default_chunk_size": 4096,
+        "enc_path": False,
     }
 )
 """Configuration options used throughout the package."""
