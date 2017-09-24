@@ -323,8 +323,12 @@ def main():
         elif args.action == 'decrypt':
             stream.decrypt(fcio, sys.stdin, sys.stdout)
     elif args.cmd == 'info':
-        config.load(args.conf)
-        print(str(config))
+        conf_type = config.load(args.conf)
+        if conf_type is not None:
+            print(str(config))
+        else:
+            print("ERROR: Could not load config {}.".format(args.conf))
+            sys.exit(1)
     elif args.cmd == 'fsck':
         root = os.path.abspath(args.root)
         fcio = get_io(args)

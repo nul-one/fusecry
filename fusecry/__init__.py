@@ -5,11 +5,14 @@ import base64
 import json
 import os
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 __licence__ = "BSD"
 __year__ = "2017"
 __author__ = "Predrag Mandic"
 __author_email__ = "github@phlogisto.com"
+
+
+#__fusecry_conf_file_name = '.fusecry'
 
 class FuseCryException(Exception):
     """Generic FuseCry exception."""
@@ -32,6 +35,8 @@ class BadConfException(FuseCryException):
 
 
 class FuseCryConf(object):
+    fusecry_conf_file_name = '.fusecry'
+
     def __init__(self, d):
         self.__dict__ = d
 
@@ -73,6 +78,8 @@ class FuseCryConf(object):
             f.write(json.dumps(self.__dict__).encode())
 
     def load(self, path):
+        if os.path.isdir(path):
+            path = os.path.join(path, self.fusecry_conf_file_name)
         if not os.path.isfile(path):
             self.type = None
             return self.type
@@ -87,7 +94,7 @@ config = FuseCryConf(
         "_kdf_iter_range": (60000,80000),
         "kdf_salt_size": 32,
         "extension": '.fcry',
-        "_conf": '.fusecry',
+        "_conf": FuseCryConf.fusecry_conf_file_name,
         "sample_size": 1024,
         "_default_chunk_size": 4096,
         "enc_path": False,
