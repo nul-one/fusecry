@@ -85,6 +85,12 @@ class FuseCryConf(object):
             return self.type
         with open(path, 'rb') as f:
             self.__dict__ = json.loads(f.read().decode())
+            comp_msg = "FuseCry version {} incompatible with conf version {}."
+            if ((self.version.split('.')[0] == "0" and
+                __version__.split('.')[:2] != self.version.split('.')[:2]) or
+                __version__.split('.')[0] != self.version.split('.')[0]):
+                raise BadConfException(comp_msg.format(
+                    __version__, self.version))
             return self.type
 
 
