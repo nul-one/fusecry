@@ -174,6 +174,30 @@ def __parse_args():
         chunk_size = config._default_chunk_size,
     )
 
+    parser_stream = subparsers.add_parser(
+        "name",
+        description="Encrypt or decrypt file or directory name."
+        )
+    parser_stream.add_argument(
+        "action", type=str, action="store", choices=('encrypt','decrypt'),
+        help="Choose encrypt or decrypt.")
+    parser_stream.add_argument(
+        "name", type=str, action="store",
+        help="Choose encrypt or decrypt.")
+    parser_stream.add_argument(
+        "-c", "--conf", type=str, action="store", required=True,
+        help="Specify or create FuseCry configuration file.")
+    parser_stream.add_argument(
+        "-p", "--password", action="store",
+        help="If not provided, will be asked for password in prompt.")
+    parser_stream.add_argument(
+        "-k", "--key", type=str, action="store",
+        help="Use RSA private key file instead of password.")
+    parser_stream.set_defaults(
+        root = os.path.abspath(os.path.curdir),
+        chunk_size = config._default_chunk_size,
+    )
+
     parser_info = subparsers.add_parser(
         "info",
         description="Show conf details."
@@ -322,6 +346,12 @@ def main():
             stream.encrypt(fcio, sys.stdin, sys.stdout)
         elif args.action == 'decrypt':
             stream.decrypt(fcio, sys.stdin, sys.stdout)
+    elif args.cmd == 'name':
+        fcio = get_io(args)
+        if args.action == 'encrypt':
+            print(fcio.cry.enc_filename(args.name))
+        elif args.action == 'decrypt':
+            print(fcio.cry.dec_filename(args.name))
     elif args.cmd == 'info':
         conf_type = config.load(args.conf)
         if conf_type is not None:

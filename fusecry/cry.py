@@ -192,13 +192,13 @@ class Cry(object):
             raise IntegrityCheckFail("Integrity check failed.")
         return self._aes_dec(enc_chunk[self.hs:])
 
-    def enc_filename(self, path):
-        byte_path = path.encode()
-        byte_path +=  bytes((AES.block_size - len(byte_path)) % AES.block_size)
-        return b32encode(self._aes_enc(byte_path)).decode().rstrip('=')
+    def enc_filename(self, name):
+        byte_name = name.encode()
+        byte_name +=  bytes((AES.block_size - len(byte_name)) % AES.block_size)
+        return b32encode(self._aes_enc(byte_name)).decode().rstrip('=')
 
-    def dec_filename(self, enc_path):
-        enc_path += '=' * ((8 - len(enc_path)) % 8)
-        byte_path = self._aes_dec(b32decode(enc_path.encode()))
-        return byte_path.rstrip(bytes(1)).decode()
+    def dec_filename(self, enc_name):
+        enc_name += '=' * ((8 - len(enc_name)) % 8)
+        byte_name = self._aes_dec(b32decode(enc_name.encode()))
+        return byte_name.rstrip(bytes(1)).decode()
 

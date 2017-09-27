@@ -5,7 +5,7 @@ import base64
 import json
 import os
 
-__version__ = "0.10.2"
+__version__ = "0.10.3"
 __licence__ = "BSD"
 __year__ = "2017"
 __author__ = "Predrag Mandic"
