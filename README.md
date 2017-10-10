@@ -150,8 +150,12 @@ RAM
 future plans and missing features (in no particular order)
 -------------------------
 
-- RAM file system option for fast file access
-- password change (bulk re-encryption)
 - dinamyc directory structure loading for encrypted file/dir names to preserve
 RAM
+- <strike>RAM file system option for fast file access</strike> Not going to be
+implemented. You can create ramfs and put encrypted data in it on your own.
+Also, bottleneck seems to be CPU and not disk I/O (at least on SSD).
+- <strike>password change (bulk re-encryption)</strike> Not going to be
+implemented. You can mount additional empty FuseCry fs with new password and
+move files over. Let's keep it simple.
 
