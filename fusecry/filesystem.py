@@ -50,8 +50,14 @@ class FuseCry(Operations):
                 result['items'] = {}
                 for enc_name in os.listdir(path):
                     if enc_name != config._conf:
-                        result['items'][self.io.cry.dec_filename(enc_name)] = \
-                            __path_to_dict(os.path.join(path,enc_name), enc_name)
+                        try:
+                            dec_filename = self.io.cry.dec_filename(enc_name)
+                            result['items'][dec_filename] = __path_to_dict(
+                                os.path.join(path,enc_name),
+                                enc_name
+                                )
+                        except:
+                            logging.error("Raw filename: {}".format(enc_name))
             return result
 
         self.root = root
@@ -128,7 +134,10 @@ class FuseCry(Operations):
                 if r in ('.','..'):
                     yield r
                 else:
-                    yield self.io.cry.dec_filename(r)
+                    try:
+                        yield self.io.cry.dec_filename(r)
+                    except:
+                        logging.error("Raw filename: {}".format(r))
         else:
             for r in dirents:
                 yield r

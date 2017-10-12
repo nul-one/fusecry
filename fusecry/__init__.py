@@ -5,14 +5,12 @@ import base64
 import json
 import os
 
-__version__ = "0.10.3"
+__version__ = "0.11.0"
 __licence__ = "BSD"
 __year__ = "2017"
 __author__ = "Predrag Mandic"
 __author_email__ = "github@phlogisto.com"
 
-
-#__fusecry_conf_file_name = '.fusecry'
 
 class FuseCryException(Exception):
     """Generic FuseCry exception."""
@@ -34,8 +32,14 @@ class BadConfException(FuseCryException):
     pass
 
 
+#TODO: use this
+class RawFilenameException(FuseCryException):
+    """Raised if raw filename was encountered in fs with encrypted paths."""
+    pass
+
+
 class FuseCryConf(object):
-    fusecry_conf_file_name = '.fusecry'
+    fusecry_conf_file_name = 'fusecry.conf'
 
     def __init__(self, d):
         self.__dict__ = d

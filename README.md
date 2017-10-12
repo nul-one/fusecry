@@ -48,15 +48,15 @@ usage
 `fusecry umount MOUNT_POINT` or `fusermount -u MOUNT_POINT`  
 Data copied to mount point will remain encrypted in source directory.  
 Use `-n` or `--encrypt-filenames` to also have file and directory names
-encrypted. This option is really needed only on the first mount when FuseCry
-config file is being generated.  
+encrypted. This option is really needed only on the first mount when
+fusecry.conf file is being generated.  
 **Watch out**: if `-n` is used, actual file and directory names on disk will be
 60%+ longer than originals and thus some long names won't be valid! Check what
 maximum filename and path length values are on your system.
 
 ### mount subdirectory
 
-`fusecry mount SOURCE_DIR/subdir MOUNT_POINT --conf SOURCE_DIR/.fusecry [--key RSA_KEY_PATH]`
+`fusecry mount SOURCE_DIR/subdir MOUNT_POINT --conf SOURCE_DIR/fusecry.conf [--key RSA_KEY_PATH]`
 
 ### single file encryption
 
@@ -81,14 +81,16 @@ during fsck or you might get false-positive errors detected.
 ### info
 
 Use this to show info about encryption:  
-`fusecry info CONF` where `CONF` is the FuseCry config file (e.g. `.fusecry`).
+`fusecry info CONF` where `CONF` is the FuseCry config file or
+`fusecry info SOURCE_DIR` if `SOURCE_DIR` contains default-named config file
+`fusecry.conf`.
 
 FuseCry conf file
 -------------------------
 
 This is a json file where FuseCry stores information about encryption for
-particular ROOT or single encrypted file. It will default to `.fusecry` when
-mounting or `FILE_NAME.fusecry` when encrypting single file.  
+particular ROOT or single encrypted file. It will default to `fusecry.conf`
+when mounting or `FILE_NAME.fusecry` when encrypting single file.  
 **Important**: Decryption won't work without this file, so it must not be lost.
 It is safe to share this file, it won't help attackers in any way.  
 When mounting ROOT to MOUNTPOINT, this file will not be accessible (visible) on
