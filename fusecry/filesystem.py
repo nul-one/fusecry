@@ -56,8 +56,8 @@ class FuseCry(Operations):
                                 os.path.join(path,enc_name),
                                 enc_name
                                 )
-                        except:
-                            logging.error("Raw filename: {}".format(enc_name))
+                        except Exception as e:
+                            logging.error("{}, {}".format(e, enc_name))
             return result
 
         self.root = root
@@ -136,8 +136,8 @@ class FuseCry(Operations):
                 else:
                     try:
                         yield self.io.cry.dec_filename(r)
-                    except:
-                        logging.error("Raw filename: {}".format(r))
+                    except Exception as e:
+                        logging.error("{}, {}".format(e, r))
         else:
             for r in dirents:
                 yield r

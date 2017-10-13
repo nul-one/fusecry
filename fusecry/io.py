@@ -227,14 +227,19 @@ class FuseCryIO(object):
             None: If no errors were encountered.
         """
         size = 0
+        if config.enc_path:
+            try:
+                self.cry.dec_filename(os.path.basename(path))
+            except Exception as e:
+                return "{}: {}, {}".format(type(e), e, path)
         try:
             size = self.filesize(path)
             offset = 0
             while offset < size:
                 self.read(path, self.cs, offset)
                 offset += self.cs
-        except:
-            return "{}: {}".format(type(e), e)
+        except Exception as e:
+            return "{}: {}, {}".format(type(e), e, path)
         return None
 
     def fsck(self, path):
