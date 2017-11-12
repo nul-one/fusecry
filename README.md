@@ -10,7 +10,12 @@ requirements
 -------------------------
 
 - Linux (kernel 2.6.14 or above) or OS X (10.11 or above)
-- python >= 3.5
+- python >= 3.4
+    - ubuntu/debian: `sudo apt-get install python3 python3-dev`
+    - rhel/centos: `sudo yum install python3 python3-dev`
+- libfuse
+    - ubuntu/debian: `sudo apt-get install libfuse2 libfuse-dev`
+    - rhel/centos: `sudo yum install fuse fuse-devel`
 
 install
 -------------------------
