@@ -35,36 +35,59 @@ class FuseCry(Operations):
     """
     FuseCry implementation of fuse.Operations class.
     """
+    def __path_to_dict(self, path, enc_name=None):
+        """Represent file and directory structure as dict."""
+        st = None
+        try:
+            st = os.stat(path)
+        except FileNotFoundError:
+            pass
+        result = {}
+        result['enc_name'] = enc_name
+        if st and stat.S_ISDIR(st.st_mode):
+            result['items'] = {}
+            for enc_name in os.listdir(path):
+                if enc_name != config._conf:
+                    try:
+                        dec_filename = self.io.cry.dec_filename(enc_name)
+                        result['items'][dec_filename] = self.__path_to_dict(
+                            os.path.join(path,enc_name),
+                            enc_name
+                            )
+                    except Exception as e:
+                        logging.error("{}, {}".format(e, enc_name))
+        return result
+
+    def __enc_path_delete(self, path):
+        if path.startswith(os.path.sep):
+            path = path[len(os.path.sep):]
+        path_parent = self.fs_map
+        for name in path.split(os.path.sep)[:-1]:
+            path_parent = path_parent['items'][name]
+        del path_parent['items'][path.split(os.path.sep)[-1]]
+
+    def __enc_path_rename(self, old, new):
+        if old.startswith(os.path.sep):
+            old = old[len(os.path.sep):]
+        if new.startswith(os.path.sep):
+            new = new[len(os.path.sep):]
+        old_fs_map = self.fs_map
+        new_fs_map = self.fs_map
+        for name in old.split(os.path.sep):
+            old_fs_map = old_fs_map['items'][name]
+        for name in new.split(os.path.sep):
+            new_fs_map = new_fs_map['items'][name]
+        if 'items' in old_fs_map:
+            new_fs_map['items'] = old_fs_map['items']
+        self.__enc_path_delete(old)
 
     def __init__(self, root, io, debug=False):
-        def __path_to_dict(path, enc_name=None):
-            """Represent file and directory structure as dict."""
-            st = None
-            try:
-                st = os.stat(path)
-            except FileNotFoundError:
-                pass
-            result = {}
-            result['enc_name'] = enc_name
-            if st and stat.S_ISDIR(st.st_mode):
-                result['items'] = {}
-                for enc_name in os.listdir(path):
-                    if enc_name != config._conf:
-                        try:
-                            dec_filename = self.io.cry.dec_filename(enc_name)
-                            result['items'][dec_filename] = __path_to_dict(
-                                os.path.join(path,enc_name),
-                                enc_name
-                                )
-                        except Exception as e:
-                            logging.error("{}, {}".format(e, enc_name))
-            return result
 
         self.root = root
         self.io = io
         if config.enc_path:
             self.real_path = self.__crypto_real_path
-            self.fs_map = __path_to_dict(root)
+            self.fs_map = self.__path_to_dict(root)
         else:
             self.real_path = self.__real_path
             self.fs_map = None
@@ -163,7 +186,9 @@ class FuseCry(Operations):
     def rmdir(self, path):
         real_path = self.real_path(path)
         if real_path == self.conf_path: return None
-        return os.rmdir(real_path)
+        result = os.rmdir(real_path)
+        self.__enc_path_delete(path)
+        return result
 
     @debug_log
     def mkdir(self, path, mode):
@@ -192,7 +217,9 @@ class FuseCry(Operations):
     def unlink(self, path):
         real_path = self.real_path(path)
         if real_path == self.conf_path: return None
-        return os.unlink(real_path)
+        result = os.unlink(real_path)
+        self.__enc_path_delete(path)
+        return result
 
     @debug_log
     def symlink(self, name, target):
@@ -207,7 +234,10 @@ class FuseCry(Operations):
         real_new = self.real_path(new)
         if real_old == self.conf_path: return None
         if real_new == self.conf_path: return None
-        return os.rename(real_old, real_new)
+        result = os.rename(real_old, real_new)
+        if config.enc_path:
+            self.__enc_path_rename(old, new)
+        return result
 
     @debug_log
     def link(self, target, name):

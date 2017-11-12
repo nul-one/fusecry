@@ -5,7 +5,7 @@ import base64
 import json
 import os
 
-__version__ = "0.11.1"
+__version__ = "0.11.2"
 __licence__ = "BSD"
 __year__ = "2017"
 __author__ = "Predrag Mandic"
@@ -29,12 +29,6 @@ class FileSizeException(FuseCryException):
 
 class BadConfException(FuseCryException):
     """Raised when FuseCry conf is not valid or not matching."""
-    pass
-
-
-#TODO: use this
-class RawFilenameException(FuseCryException):
-    """Raised if raw filename was encountered in fs with encrypted paths."""
     pass
 
 
